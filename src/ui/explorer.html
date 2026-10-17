@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRUSWAP Explorer | Real-Time TRU Blockchain Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/header.css">
+  <link rel="stylesheet" href="/css/cards.css">
+  <link rel="stylesheet" href="/css/modals.css">
+
+  <style>
+    html, body {
+      overflow-x: hidden;
+      max-width: 100vw;
+    }
+
+    .explorer-container {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 24px 20px 60px 20px;
+      width: 100%;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      overflow-x: hidden;
+    }
+
+    /* Hero Search Bar Box */
+    .explorer-hero-box {
+      background: linear-gradient(180deg, #171d2b 0%, #0d1017 100%);
+      border: 1px solid rgba(0, 240, 255, 0.28);
+      border-radius: 18px;
+      padding: 24px 26px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.15), 0 0 25px rgba(0, 240, 255, 0.12);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .explorer-hero-box::before {
+      content: '';
+      position: absolute;
+      top: -40px;
+      right: 10%;
+      width: 260px;
+      height: 80px;
+      background: radial-gradient(ellipse at 50% 0%, rgba(0, 240, 255, 0.3) 0%, transparent 70%);
+      filter: blur(20px);
+      pointer-events: none;
+    }
+
+    .explorer-hero-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .explorer-hero-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.2px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .explorer-hero-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+
+    .explorer-search-form {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .explorer-search-input-wrap {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+
+    .explorer-search-icon {
+      position: absolute;
+      left: 14px;
+      font-size: 1.1rem;
+      color: var(--accent-cyan);
+      pointer-events: none;
+    }
+
+    .explorer-search-input {
+      width: 100%;
+      background: #090c13;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 12px 14px 12px 42px;
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: #ffffff;
+      box-sizing: border-box;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .explorer-search-input:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.35);
+      background: #0c101a;
+    }
+
+    .explorer-search-btn {
+      background: linear-gradient(135deg, #00f0ff 0%, #0077ff 100%);
+      border: none;
+      border-radius: 10px;
+      padding: 0 24px;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #000000;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0, 240, 255, 0.35);
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .explorer-search-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 240, 255, 0.5);
+      filter: brightness(1.1);
+    }
+
+    .explorer-search-chips {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .search-chip-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .search-chip {
+      background: #111520;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 0.72rem;
+      color: #94a3b8;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .search-chip:hover {
+      border-color: var(--accent-cyan);
+      color: #ffffff;
+      background: rgba(0, 240, 255, 0.1);
+    }
+
+    /* Swap Market Navigation Button */
+    .swap-market-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 32px;
+      min-height: 32px;
+      max-height: 32px;
+      padding: 0 14px;
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #ffffff;
+      background: linear-gradient(180deg, #2b3342 0%, #161922 100%);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      border-radius: 8px;
+      white-space: nowrap;
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 2px 6px rgba(0, 0, 0, 0.5);
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+      line-height: 1;
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    .swap-market-btn:hover {
+      background: linear-gradient(180deg, #374256 0%, #1e2432 100%);
+      border-color: #00f0ff;
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.35);
+      color: #00f0ff;
+    }
+
+    /* 4-Card Stats Grid (Equal Width & Height) */
+    .explorer-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      align-items: stretch;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    @media (max-width: 960px) {
+      .explorer-stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 12px;
+      }
+    }
+
+    .explorer-stat-card {
+      background: linear-gradient(180deg, #161b26 0%, #0e1118 100%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 16px 18px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+      min-height: 102px;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      gap: 6px;
+      position: relative;
+    }
+
+    .stat-card-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 18px;
+      min-width: 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .stat-card-val {
+      font-family: var(--font-mono);
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.2;
+    }
+
+    .stat-card-sub {
+      font-size: 0.74rem;
+      color: #8c9ba5;
+      font-family: var(--font-mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Dual Feed Grid */
+    .explorer-feed-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .explorer-feed-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .explorer-feed-panel {
+      background: #101422;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .explorer-feed-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .feed-header-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: 0.2px;
+    }
+
+    .feed-header-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+    }
+
+    .feed-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 580px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+      padding-right: 4px;
+    }
+
+    .feed-list::-webkit-scrollbar {
+      width: 5px;
+    }
+    .feed-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.16);
+      border-radius: 4px;
+    }
+
+    /* Block item row */
+    .feed-block-item {
+      background: #0c0f16;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .feed-block-item:hover {
+      background: #141924;
+      border-color: rgba(0, 240, 255, 0.35);
+      transform: translateX(2px);
+    }
+
+    .feed-block-item.just-added {
+      animation: highlightFlash 1.5s ease-out;
+    }
+
+    @keyframes highlightFlash {
+      0% { background: rgba(0, 240, 255, 0.25); border-color: #00f0ff; }
+      100% { background: #0c0f16; border-color: rgba(255, 255, 255, 0.07); }
+    }
+
+    .block-item-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .block-height-pill {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--tru-gold);
+      background: rgba(255, 184, 0, 0.12);
+      border: 1px solid rgba(255, 184, 0, 0.35);
+      padding: 3px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+
+    .block-meta-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .block-hash-short {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+
+    .block-time-ago {
+      font-size: 0.7rem;
+      color: #64748b;
+    }
+
+    .block-item-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      text-align: right;
+    }
+
+    .block-txs-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    .block-vol-text {
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: #cbd5e1;
+      font-weight: 600;
+    }
+
+    /* Tx item row */
+    .feed-tx-item {
+      background: #0c0f16;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .feed-tx-item:hover {
+      background: #141924;
+      border-color: rgba(99, 102, 241, 0.35);
+      transform: translateX(2px);
+    }
+
+    .tx-item-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      overflow: hidden;
+      max-width: 65%;
+    }
+
+    .tx-id-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tx-id-text {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--accent-cyan);
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tx-badges-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .tx-item-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      text-align: right;
+    }
+
+    .tx-amount-val {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      font-weight: 800;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+
+    .tx-amount-val .unit {
+      color: var(--tru-gold);
+      font-size: 0.76rem;
+    }
+
+    /* Detail View Card */
+    .explorer-detail-box {
+      background: linear-gradient(180deg, #161b26 0%, #0d1017 100%);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .detail-nav-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .detail-back-btn {
+      background: #111520;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      padding: 6px 14px;
+      color: #ffffff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .detail-back-btn:hover {
+      background: #1a2030;
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+    }
+
+    .address-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .address-stat-hero {
+      grid-column: 1 / -1;
+      border-color: rgba(0, 240, 255, 0.45) !important;
+      background: linear-gradient(180deg, #152233 0%, #0d121a 100%) !important;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.1) !important;
+    }
+
+    .hero-val {
+      font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;
+      text-shadow: 0 0 14px rgba(0, 240, 255, 0.45);
+      word-break: break-all;
+    }
+
+    .stat-unit {
+      font-size: 0.76rem;
+      color: #94a3b8;
+      font-weight: 600;
+      margin-left: 2px;
+    }
+
+    @media (max-width: 640px) {
+      .explorer-container {
+        padding: 12px 10px 40px 10px;
+        gap: 14px;
+      }
+
+      .explorer-hero-box {
+        padding: 16px 14px;
+        gap: 12px;
+        border-radius: 14px;
+      }
+
+      .explorer-hero-title {
+        font-size: 1.15rem;
+      }
+
+      .explorer-hero-subtitle {
+        font-size: 0.74rem;
+      }
+
+      .explorer-search-chips {
+        gap: 6px;
+      }
+
+      .search-chip {
+        padding: 2px 7px;
+        font-size: 0.68rem;
+      }
+
+      .explorer-search-form {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .explorer-search-input-wrap {
+        width: 100%;
+      }
+
+      .explorer-search-input {
+        padding: 10px 12px 10px 38px;
+        font-size: 0.8rem;
+      }
+
+      .explorer-search-btn {
+        width: 100%;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        font-size: 0.85rem;
+      }
+
+      .explorer-stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px;
+        align-items: stretch;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .address-stats-grid {
+        gap: 10px;
+      }
+
+      .explorer-stat-card {
+        padding: 12px 12px;
+        border-radius: 12px;
+        height: 100%;
+        min-height: 92px;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 4px;
+      }
+
+      .swap-market-btn {
+        height: 30px;
+        min-height: 30px;
+        max-height: 30px;
+        padding: 0 10px;
+        font-size: 0.74rem;
+      }
+
+      .stat-card-val {
+        font-size: 1.15rem;
+      }
+
+      .stat-card-label {
+        font-size: 0.65rem;
+        height: 16px;
+      }
+
+      .stat-card-sub {
+        font-size: 0.68rem;
+      }
+
+      .explorer-detail-box {
+        padding: 14px 12px;
+        border-radius: 14px;
+        gap: 14px;
+        overflow-x: hidden;
+      }
+
+      .detail-nav-row {
+        gap: 8px;
+      }
+
+      .feed-tx-item {
+        padding: 8px 10px;
+        gap: 8px;
+      }
+
+      .tx-item-left {
+        max-width: calc(100% - 68px);
+      }
+
+      .block-txs-badge {
+        font-size: 0.68rem;
+        padding: 2px 5px;
+      }
+    }
+
+    /* Floating Scroll To Top Button (Shifted higher and left to avoid text overlap) */
+    .scroll-to-top-btn {
+      position: fixed;
+      bottom: 76px;
+      right: 32px;
+      z-index: 9999;
+      background: linear-gradient(135deg, rgba(16, 21, 33, 0.95) 0%, rgba(9, 12, 19, 0.95) 100%);
+      border: 1px solid rgba(0, 240, 255, 0.45);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.65), 0 0 16px rgba(0, 240, 255, 0.25);
+      color: #00f0ff;
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      font-family: var(--font-mono);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(12px);
+      transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s ease, border-color 0.2s, box-shadow 0.2s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .scroll-to-top-btn.visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .scroll-to-top-btn:hover {
+      border-color: #00f0ff;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.8), 0 0 22px rgba(0, 240, 255, 0.55);
+      color: #ffffff;
+      transform: translateY(-2px);
+    }
+
+    .scroll-to-top-btn:active {
+      transform: translateY(1px) scale(0.95);
+    }
+
+    .scroll-top-arrow {
+      font-size: 0.85rem;
+      line-height: 1;
+    }
+
+    .scroll-top-text {
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    @media (max-width: 640px) {
+      .scroll-to-top-btn {
+        bottom: 68px;
+        right: 24px;
+        padding: 6px 10px;
+        border-radius: 8px;
+      }
+      .scroll-top-arrow {
+        font-size: 0.8rem;
+      }
+      .scroll-top-text {
+        font-size: 0.58rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Mecha Cockpit Top Navigation Header -->
+  <header class="mecha-header">
+    <div class="mecha-vent-grille mecha-vent-left" aria-hidden="true"></div>
+
+    <div class="mecha-header-inner">
+      <!-- Brand with Explorer Badge -->
+      <div class="mecha-brand" onclick="location.href='/'" style="cursor: pointer;" title="Back to TRUSWAP Market">
+        <div class="mecha-brand-info">
+          <div class="mecha-brand-title-row">
+            <span class="mecha-brand-title">TRUSWAP</span>
+            <span class="mecha-brand-version" style="background: rgba(0, 240, 255, 0.15); border-color: #00f0ff; color: #00f0ff;">EXPLORER</span>
+          </div>
+          <span class="mecha-brand-tagline">TRU Blockchain Explorer</span>
+        </div>
+      </div>
+
+      <!-- Navigation & Telemetry Pod -->
+      <div class="mecha-telemetry">
+        <a href="/" class="swap-market-btn" title="Back to TRUSWAP Market">
+          <span>⚡</span> Swap Market
+        </a>
+
+        <!-- All-in-one Network & Telemetry Pod Display -->
+        <div class="mecha-chain-pod" id="pill-scanner" title="TRU Network Telemetry">
+          <div class="pod-glow-rim top"></div>
+
+          <!-- Node Connection Status -->
+          <div class="chain-pod-section" id="pill-ws" title="Node WebSocket connection status">
+            <span class="status-dot active" id="dot-ws" style="background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green);"></span>
+            <span class="mecha-online-text" id="text-ws">Online</span>
+          </div>
+
+          <div class="chain-pod-divider"></div>
+
+          <!-- TRU Block Height -->
+          <div class="chain-pod-section" title="TRU Blockchain Tip">
+            <span class="chain-badge">TRU</span>
+            <span class="chain-height-val" id="header-chain-status">#...</span>
+          </div>
+
+          <div class="chain-pod-divider"></div>
+
+          <!-- P2P Mesh Peers -->
+          <div class="chain-pod-section" title="P2P Mesh Peers">
+            <span class="chain-peers-text" id="header-peers-badge">2 peers</span>
+          </div>
+
+          <div class="chain-pod-divider"></div>
+
+          <!-- Mempool -->
+          <div class="chain-pod-section" id="pill-mempool" style="cursor: pointer;" onclick="inspectMempool()" title="Click to inspect P2P Mempool">
+            <span class="mempool-pod-label">Mempool:</span>
+            <span id="header-mempool-count" class="mempool-pod-val">0 txs</span>
+          </div>
+
+          <div class="pod-glow-rim bottom"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mecha-vent-grille mecha-vent-right" aria-hidden="true"></div>
+  </header>
+
+  <main class="explorer-container">
+    <!-- Hero Search Bar Box -->
+    <div class="explorer-hero-box">
+      <div class="explorer-hero-title-row">
+        <div>
+          <h1 class="explorer-hero-title">
+            <span style="color: var(--accent-cyan);">🔍</span> TRU Blockchain Explorer
+          </h1>
+          <p class="explorer-hero-subtitle">
+            Search blocks, transactions, smart HTLC escrow outpoints, and wallet addresses in real time
+          </p>
+        </div>
+        <div class="explorer-search-chips">
+          <span class="search-chip-label">Quick:</span>
+          <button type="button" class="search-chip" id="chip-latest-block">Latest Tip</button>
+          <button type="button" class="search-chip" id="chip-mempool">Mempool</button>
+          <button type="button" class="search-chip" onclick="showLiveFeedView()">All Blocks</button>
+        </div>
+      </div>
+
+      <form class="explorer-search-form" id="explorer-search-form" onsubmit="handleExplorerSearch(event)">
+        <div class="explorer-search-input-wrap">
+          <span class="explorer-search-icon">🔍</span>
+          <input type="text" id="explorer-search-input" class="explorer-search-input"
+            placeholder="Search height (#45305), hash, TXID, address..." autocomplete="off"
+            spellcheck="false">
+        </div>
+        <button type="submit" class="explorer-search-btn">SEARCH</button>
+      </form>
+    </div>
+
+    <!-- 4 Live Telemetry Metric Cards -->
+    <div class="explorer-stats-grid">
+      <div class="explorer-stat-card">
+        <div class="stat-card-label">
+          <span>Block Height Tip</span>
+          <span>⛏️</span>
+        </div>
+        <div class="stat-card-val" id="stat-tip-height" style="color: var(--tru-gold);">#...</div>
+        <div class="stat-card-sub" id="stat-tip-hash">—</div>
+      </div>
+
+      <div class="explorer-stat-card">
+        <div class="stat-card-label">
+          <span>Last Block Time</span>
+          <span>⏱️</span>
+        </div>
+        <div class="stat-card-val" id="stat-block-time" style="color: var(--accent-cyan);">Just now</div>
+        <div class="stat-card-sub" id="stat-block-utc">—</div>
+      </div>
+
+      <div class="explorer-stat-card" id="card-mempool" style="cursor: pointer;" onclick="inspectMempool()" title="Click to inspect P2P Mempool">
+        <div class="stat-card-label">
+          <span>Mempool</span>
+          <span>⚡</span>
+        </div>
+        <div class="stat-card-val" id="stat-mempool-count" style="color: #60a5fa;">0 TXs</div>
+        <div class="stat-card-sub" id="stat-mempool-vol">0.00 TRU pending</div>
+      </div>
+
+      <div class="explorer-stat-card">
+        <div class="stat-card-label">
+          <span>Connected Peers</span>
+          <span>🌐</span>
+        </div>
+        <div class="stat-card-val" id="stat-peers-count" style="color: var(--accent-green);">2 Peers</div>
+        <div class="stat-card-sub">P2P Network</div>
+      </div>
+    </div>
+
+    <!-- Dynamic View Container (Toggled via JS: Live Feeds VS Single Details) -->
+    <div id="explorer-dynamic-view">
+      <!-- Default: Real-Time Dual Feed (Blocks + Transactions) -->
+      <div class="explorer-feed-grid" id="explorer-feed-grid">
+        <!-- Column 1: Latest Blocks -->
+        <div class="explorer-feed-panel">
+          <div class="explorer-feed-header">
+            <div class="feed-header-title">
+              <span style="color: var(--tru-gold);">📦</span> Latest Blocks
+            </div>
+          </div>
+          <div class="feed-list" id="feed-blocks-list">
+            <div style="text-align: center; color: var(--text-dim); padding: 40px; font-size: 0.85rem;">
+              Loading recent blocks from TRU chain...
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 2: Latest Transactions -->
+        <div class="explorer-feed-panel">
+          <div class="explorer-feed-header">
+            <div class="feed-header-title">
+              <span style="color: var(--accent-cyan);">⚡</span> Latest Transactions
+            </div>
+          </div>
+          <div class="feed-list" id="feed-txs-list">
+            <div style="text-align: center; color: var(--text-dim); padding: 40px; font-size: 0.85rem;">
+              Tracking mempool and confirmed transactions...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail View (Injected dynamically for block, tx, or address) -->
+      <div class="explorer-detail-box" id="explorer-detail-box" style="display: none;">
+        <!-- Injected via explorer.js -->
+      </div>
+    </div>
+  </main>
+
+  <!-- Floating Scroll To Top Button -->
+  <button type="button" id="scroll-to-top-btn" class="scroll-to-top-btn" onclick="scrollToTop()" title="Scroll to Top" aria-label="Scroll to Top">
+    <span class="scroll-top-arrow">▲</span>
+    <span class="scroll-top-text">TOP</span>
+  </button>
+
+  <footer>
+    <div style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;">
+      <span>TRUSWAP Explorer</span>
+      <span style="color: var(--card-border);">•</span>
+      <a href="/docs" style="color: var(--accent-cyan); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.22); transition: all 0.2s ease;" onmouseover="this.style.borderColor='var(--accent-cyan)'; this.style.boxShadow='0 0 10px rgba(0,240,255,0.3)';" onmouseout="this.style.borderColor='rgba(0, 240, 255, 0.22)'; this.style.boxShadow='none';" title="Read The TRUSWAP Book — Comprehensive Guide & Architecture">
+        <span style="font-size: 0.95rem;">📖</span>
+        <span>The TRUSWAP Book</span>
+      </a>
+    </div>
+  </footer>
+
+  <script>
+    let sessionToken = "";
+    window.sessionToken = sessionToken;
+  </script>
+  <script src="/js/config.js"></script>
+  <script src="/js/explorer.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,16 @@
+# Auto-detect text files and normalize line endings
+* text=auto
+
+# GitHub Linguist Overrides
+# Exclude embedded web UI assets from language statistics
+src/ui/** linguist-vendored linguist-detectable=false
+
+# Exclude documentation and pre-rendered book HTML from language statistics
+docs/** linguist-documentation linguist-detectable=false
+
+# Exclude standalone maintenance scripts from language statistics
+scripts/** linguist-vendored linguist-detectable=false
+*.sh linguist-vendored linguist-detectable=false
+
+# Explicitly ensure smart contracts are counted in language statistics
+contracts/*.sol linguist-detectable=true

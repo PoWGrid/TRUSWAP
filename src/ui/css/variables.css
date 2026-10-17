@@ -1,0 +1,145 @@
+:root {
+  --bg: #07090e;
+  --card-bg: #101422;
+  --card-border: rgba(255, 255, 255, 0.08);
+  --card-hover: rgba(255, 255, 255, 0.12);
+  --tru-gold: #ffb800;
+  --tru-gold-glow: rgba(255, 184, 0, 0.25);
+  --base-blue: #0052ff;
+  --base-blue-glow: rgba(0, 82, 255, 0.3);
+  --accent-cyan: #00f0ff;
+  --accent-green: #00e676;
+  --accent-red: #ff3366;
+  --text: #f0f3f8;
+  --text-dim: #8c9ba5;
+  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 240, 255, 0.35) rgba(10, 13, 19, 0.8);
+}
+
+/* Global TRUSWAP Custom Cockpit Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 13, 19, 0.8);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.35);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.65);
+}
+
+body {
+  background-color: var(--bg);
+  background-image: 
+    radial-gradient(circle at 15% 10%, rgba(255, 184, 0, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 85% 20%, rgba(0, 82, 255, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 50% 80%, rgba(0, 240, 255, 0.04) 0%, transparent 50%);
+  color: var(--text);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+.top-glow-bar {
+  display: none;
+}
+
+.container {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 30px 24px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 16px 12px;
+    gap: 16px;
+  }
+}
+
+.badge-confs {
+  font-size: 0.72rem;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  background: rgba(0, 230, 118, 0.12);
+  color: var(--accent-green);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+}
+
+.toast-msg {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(18, 22, 34, 0.95);
+  border: 1px solid var(--accent-green);
+  color: var(--accent-green);
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s;
+  pointer-events: none;
+}
+
+.toast-msg.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast-msg.error {
+  border-color: #ef4444;
+  color: #f87171;
+  background: rgba(30, 15, 20, 0.96);
+  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
+}
+
+.toast-msg.warning {
+  border-color: #f59e0b;
+  color: #fbbf24;
+  background: rgba(30, 24, 15, 0.96);
+  box-shadow: 0 10px 30px rgba(245, 158, 11, 0.3);
+}
+
+.toast-msg.info {
+  border-color: #38bdf8;
+  color: #38bdf8;
+  background: rgba(15, 25, 40, 0.96);
+  box-shadow: 0 10px 30px rgba(56, 189, 248, 0.3);
+}
+
+footer {
+  margin-top: auto;
+  padding: 24px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  border-top: 1px solid var(--card-border);
+}

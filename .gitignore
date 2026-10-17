@@ -1,0 +1,51 @@
+# Build targets & compiled binaries
+/target
+/truswap
+/truswap_*
+/releases
+/release.md
+*.zip
+*.tar.gz
+*.apk
+*.aab
+*.idsig
+
+# Screenshots & captures
+screen_*.png
+*.png
+
+# Data directories & databases
+/data
+*.sqlite
+*.sqlite3
+*.db
+
+# Logs & process files
+*.log
+*.pid
+--help/
+
+# Environment files & secrets
+.env
+.env.*
+!.env.example
+WALLETS.md
+*.key
+*.dat
+*.pem
+*.crt
+*.pfx
+*.p12
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# IDE & OS metadata
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+

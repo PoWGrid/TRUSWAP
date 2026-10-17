@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRUSWAP | P2P Cross-Chain Atomic Swaps (TRU ↔ Base)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700;800&display=swap">
+  <script src="/js/qrcode.min.js"></script>
+  <script src="/js/jsqr.min.js"></script>
+
+  <!-- Modular Stylesheets -->
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/header.css">
+  <link rel="stylesheet" href="/css/cards.css">
+  <link rel="stylesheet" href="/css/modals.css">
+</head>
+
+<body>
+  <!-- Mecha Cyberpunk Console Header -->
+  <header>
+    <!-- Top Multi-Segment LED Rail -->
+    <div class="mecha-led-rail">
+      <div class="mecha-led-segment led-gold"></div>
+      <div class="mecha-led-segment led-green"></div>
+      <div class="mecha-led-segment led-cyan"></div>
+    </div>
+
+    <!-- Left Vent Grille -->
+    <div class="mecha-vent-grille mecha-vent-left" aria-hidden="true"></div>
+
+    <!-- Main Header Content -->
+    <div class="mecha-header-inner">
+      <!-- Brand -->
+      <div class="mecha-brand">
+        <div class="mecha-brand-info">
+          <div class="mecha-brand-title-row">
+            <span class="mecha-brand-title">TRUSWAP</span>
+            <span class="mecha-brand-version">v1.0.0</span>
+          </div>
+          <span class="mecha-brand-tagline">Atomic P2P Market</span>
+        </div>
+      </div>
+
+      <!-- Telemetry & Status Group -->
+      <div class="mecha-telemetry">
+        <!-- All-in-one Network & Telemetry Pod Display -->
+        <div class="mecha-chain-pod" id="pill-scanner" title="TRU Network Telemetry">
+          <div class="pod-glow-rim top"></div>
+
+          <!-- Node Connection Status -->
+          <div class="chain-pod-section" id="pill-ws" title="Node WebSocket connection status">
+            <span class="status-dot" id="dot-ws"></span>
+            <span class="mecha-online-text" id="text-ws">Connecting</span>
+          </div>
+
+          <div class="chain-pod-divider"></div>
+
+          <!-- TRU Block Height & Explorer (Click to open Explorer) -->
+          <a href="/explorer" class="chain-pod-section chain-pod-clickable" id="header-explorer-btn"
+            title="Open TRU Real-Time Block &amp; Transaction Explorer (/explorer)" style="text-decoration: none; color: inherit; display: inline-flex; align-items: center; gap: 6px;">
+            <span style="font-size: 0.95rem; filter: drop-shadow(0 0 6px rgba(0,240,255,0.7)); line-height: 1;" title="Explorer">🔍</span>
+            <span class="chain-badge">TRU</span>
+            <span class="chain-height-val" id="header-chain-status">#...</span>
+          </a>
+
+          <div class="chain-pod-divider"></div>
+
+          <!-- P2P Mesh Peers -->
+          <div class="chain-pod-section" title="P2P Mesh Peers">
+            <span class="chain-peer-dot active" id="dot-scanner" style="display:none;"></span>
+            <span class="chain-peers-text" id="header-peers-badge">0 peers</span>
+          </div>
+
+          <div class="chain-pod-divider"></div>
+
+          <!-- Mempool (Click to open Mempool in Explorer) -->
+          <a href="/explorer?view=mempool" class="chain-pod-section chain-pod-clickable chain-pod-mempool" id="pill-mempool"
+            title="Open TRU Mempool in Explorer" style="text-decoration: none; color: inherit;">
+            <span class="mempool-pod-label">Mempool:</span>
+            <span id="header-mempool-count" class="mempool-pod-val">0 txs</span>
+          </a>
+
+          <div class="pod-glow-rim bottom"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Vent Grille -->
+    <div class="mecha-vent-grille mecha-vent-right" aria-hidden="true"></div>
+  </header>
+
+  <main class="container">
+    <!-- Row 1: Dual Wallets & Vaults -->
+    <div class="wallets-grid">
+      <!-- TRU Vault Card -->
+      <div class="glass-card tru-vault-card" id="tru-vault-card">
+        <!-- Top Header -->
+        <div class="vault-header">
+          <div class="vault-title-group">
+            <span class="vault-bolt-icon">⚡</span>
+            <span class="vault-title-text">TRU Vault</span>
+          </div>
+          <div class="vault-header-controls">
+            <button class="vault-export-btn" onclick="openVaultModal('export')"
+              title="Export Keys & Seed Phrase">Export</button>
+          </div>
+        </div>
+
+        <!-- Laser Light Divider -->
+        <div class="vault-laser-divider"></div>
+
+        <!-- Glowing Balance -->
+        <div class="vault-balance-center">
+          <span class="vault-balance-num" id="tru-balance">0.00000000</span>
+          <span class="vault-balance-unit">TRU</span>
+        </div>
+
+        <!-- Address Box -->
+        <div class="vault-address-container">
+          <div class="vault-address-header">Receiving Address</div>
+          <div class="vault-address-row">
+            <span class="vault-address-code" id="tru-vault-address">Detecting local node vault...</span>
+            <button class="vault-copy-btn" onclick="copyTruAddress()" title="Copy Receiving Address">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Dual Cyber Mecha Action Buttons -->
+        <div class="vault-actions-grid">
+          <!-- Deposit Cyber Button -->
+          <button class="cyber-btn cyber-btn-deposit" onclick="openVaultModal('deposit')" title="Deposit TRU to Vault">
+            <svg class="cyber-btn-svg" viewBox="0 0 260 52" fill="none" preserveAspectRatio="none">
+              <defs>
+                <filter id="dep-amber-glow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="3.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+                <linearGradient id="dep-border-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#ffb800" />
+                  <stop offset="20%" stop-color="#ff9000" />
+                  <stop offset="50%" stop-color="#73491b" />
+                  <stop offset="80%" stop-color="#ff9000" />
+                  <stop offset="100%" stop-color="#ffb800" />
+                </linearGradient>
+                <linearGradient id="dep-bg-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#241e17" />
+                  <stop offset="100%" stop-color="#14100b" />
+                </linearGradient>
+              </defs>
+
+              <!-- Notched Tech Bezel Body -->
+              <path
+                d="M 18,3 L 80,3 L 86,7 L 174,7 L 180,3 L 242,3 C 251,3 257,8 257,17 L 257,35 C 257,44 251,49 242,49 L 180,49 L 174,45 L 86,45 L 80,49 L 18,49 C 9,49 3,44 3,35 L 3,17 C 3,8 9,3 18,3 Z"
+                fill="url(#dep-bg-grad)" stroke="url(#dep-border-grad)" stroke-width="2"
+                filter="url(#dep-amber-glow)" />
+
+              <!-- Electric Lightning Sparks Left -->
+              <path d="M 8,26 L 16,16 L 22,24 L 30,13 M 12,35 L 20,27 L 25,39" stroke="#ffb800" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" filter="url(#dep-amber-glow)" opacity="0.95" />
+
+              <!-- Electric Lightning Sparks Right -->
+              <path d="M 252,26 L 244,16 L 238,24 L 230,13 M 248,35 L 240,27 L 235,39" stroke="#ffb800" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" filter="url(#dep-amber-glow)" opacity="0.95" />
+            </svg>
+            <span class="cyber-btn-text">Deposit</span>
+          </button>
+
+          <!-- Withdraw Cyber Button -->
+          <button class="cyber-btn cyber-btn-withdraw" onclick="openVaultModal('withdraw')"
+            title="Withdraw TRU from Vault">
+            <svg class="cyber-btn-svg" viewBox="0 0 260 52" fill="none" preserveAspectRatio="none">
+              <defs>
+                <filter id="with-neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="3.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+                <linearGradient id="with-border-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#00f0ff" />
+                  <stop offset="25%" stop-color="#38bdf8" />
+                  <stop offset="50%" stop-color="#6366f1" />
+                  <stop offset="75%" stop-color="#c084fc" />
+                  <stop offset="100%" stop-color="#00f0ff" />
+                </linearGradient>
+                <linearGradient id="with-bg-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#111d33" />
+                  <stop offset="100%" stop-color="#0a0f1d" />
+                </linearGradient>
+              </defs>
+
+              <!-- Notched Tech Bezel Body -->
+              <path
+                d="M 18,3 L 80,3 L 86,7 L 174,7 L 180,3 L 242,3 C 251,3 257,8 257,17 L 257,35 C 257,44 251,49 242,49 L 180,49 L 174,45 L 86,45 L 80,49 L 18,49 C 9,49 3,44 3,35 L 3,17 C 3,8 9,3 18,3 Z"
+                fill="url(#with-bg-grad)" stroke="url(#with-border-grad)" stroke-width="2"
+                filter="url(#with-neon-glow)" />
+
+              <!-- Cyber Portal Waves / Vortex lines Left -->
+              <path d="M 7,13 C 17,17 21,33 32,38 M 15,9 C 25,13 29,37 40,42" stroke="#38bdf8" stroke-width="2"
+                stroke-linecap="round" filter="url(#with-neon-glow)" opacity="0.9" />
+
+              <!-- Cyber Portal Waves / Vortex lines Right -->
+              <path d="M 253,13 C 243,17 239,33 228,38 M 245,9 C 235,13 231,37 220,42" stroke="#c084fc" stroke-width="2"
+                stroke-linecap="round" filter="url(#with-neon-glow)" opacity="0.9" />
+            </svg>
+            <span class="cyber-btn-text">Withdraw</span>
+          </button>
+        </div>
+
+        <!-- Vault Footer Row -->
+        <div class="vault-footer-row">
+          <div class="vault-footer-lock">
+            <span>🔒</span>
+            <span>Local Encrypted Vault</span>
+          </div>
+          <button class="vault-ledger-link" onclick="openVaultModal('utxos')" title="Open UTXO Ledger Modal">
+            <span>UTXO Ledger</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Base Vault Card (Symmetrical with TRU Vault) -->
+      <div class="glass-card tru-vault-card base-vault-card" id="base-vault-card">
+        <!-- Top Header -->
+        <div class="vault-header">
+          <div class="vault-title-group">
+            <div class="base-logo-square" title="Base Network">
+              <svg width="24" height="24" viewBox="0 0 249 249" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M0 19.671C0 12.9332 0 9.56425 1.26956 6.97276C2.48511 4.49151 4.49151 2.48511 6.97276 1.26956C9.56425 0 12.9332 0 19.671 0H229.329C236.067 0 239.436 0 242.027 1.26956C244.508 2.48511 246.515 4.49151 247.73 6.97276C249 9.56425 249 12.9332 249 19.671V229.329C249 236.067 249 239.436 247.73 242.027C246.515 244.508 244.508 246.515 242.027 247.73C239.436 249 236.067 249 229.329 249H19.671C12.9332 249 9.56425 249 6.97276 247.73C4.49151 246.515 2.48511 244.508 1.26956 242.027C0 239.436 0 236.067 0 229.329V19.671Z"
+                  fill="#0000FF" />
+              </svg>
+            </div>
+            <span class="vault-title-text">Base Vault</span>
+          </div>
+          <div class="vault-header-controls">
+            <button class="vault-export-btn base-export-btn" onclick="openBaseModal('export')"
+              title="Export Base EVM Private Key">Export</button>
+          </div>
+        </div>
+
+        <!-- Laser Light Divider -->
+        <div class="vault-laser-divider" style="background: linear-gradient(90deg, transparent, #0052FF, #38bdf8, transparent); box-shadow: 0 0 12px 1.5px rgba(0, 82, 255, 0.7);"></div>
+
+        <!-- Balances Center: USDC Main + ETH Gas Sub-balance -->
+        <div class="vault-balance-center vault-balance-column">
+          <div class="vault-balance-main-row">
+            <span class="vault-balance-num" id="base-usdc-balance" style="color: #38bdf8; text-shadow: 0 0 28px rgba(0, 82, 255, 0.7), 0 0 10px rgba(56, 189, 248, 0.5);">0.00</span>
+            <span class="vault-balance-unit" style="color: #60a5fa;">USDC</span>
+          </div>
+          <div id="base-eth-sub" class="vault-gas-pill">
+            <span class="vault-gas-icon">⛽</span>
+            <span class="vault-gas-label">Gas:</span>
+            <span id="base-eth-balance" class="vault-gas-value">0.000000 ETH</span>
+          </div>
+        </div>
+
+        <!-- Base Receiving Address Container -->
+        <div class="vault-address-container">
+          <div class="vault-address-header">Receiving Address (EVM)</div>
+          <div class="vault-address-row">
+            <span class="vault-address-code" id="base-wallet-address">Detecting Base address...</span>
+            <button class="vault-copy-btn" onclick="copyBaseAddress()" title="Copy Base Address">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Actions Grid: Deposit & Withdraw (Identical SVG notched buttons to TRU Vault) -->
+        <div class="vault-actions-grid">
+          <!-- Deposit Cyber Button -->
+          <button class="cyber-btn cyber-btn-deposit base-cyber-btn" onclick="openBaseModal('deposit')"
+            title="Deposit USDC or ETH to Base Vault">
+            <svg class="cyber-btn-svg" viewBox="0 0 260 52" fill="none" preserveAspectRatio="none">
+              <defs>
+                <filter id="base-dep-glow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="3.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+                <linearGradient id="base-dep-border-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#0052ff" />
+                  <stop offset="25%" stop-color="#38bdf8" />
+                  <stop offset="50%" stop-color="#1d4ed8" />
+                  <stop offset="75%" stop-color="#38bdf8" />
+                  <stop offset="100%" stop-color="#0052ff" />
+                </linearGradient>
+                <linearGradient id="base-dep-bg-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#0d1b33" />
+                  <stop offset="100%" stop-color="#070d1a" />
+                </linearGradient>
+              </defs>
+
+              <!-- Notched Tech Bezel Body -->
+              <path
+                d="M 18,3 L 80,3 L 86,7 L 174,7 L 180,3 L 242,3 C 251,3 257,8 257,17 L 257,35 C 257,44 251,49 242,49 L 180,49 L 174,45 L 86,45 L 80,49 L 18,49 C 9,49 3,44 3,35 L 3,17 C 3,8 9,3 18,3 Z"
+                fill="url(#base-dep-bg-grad)" stroke="url(#base-dep-border-grad)" stroke-width="2"
+                filter="url(#base-dep-glow)" />
+
+              <!-- Electric Lightning Sparks Left -->
+              <path d="M 8,26 L 16,16 L 22,24 L 30,13 M 12,35 L 20,27 L 25,39" stroke="#38bdf8" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" filter="url(#base-dep-glow)" opacity="0.95" />
+
+              <!-- Electric Lightning Sparks Right -->
+              <path d="M 252,26 L 244,16 L 238,24 L 230,13 M 248,35 L 240,27 L 235,39" stroke="#38bdf8" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" filter="url(#base-dep-glow)" opacity="0.95" />
+            </svg>
+            <span class="cyber-btn-text" style="color: #38bdf8;">Deposit</span>
+          </button>
+
+          <!-- Withdraw Cyber Button -->
+          <button class="cyber-btn cyber-btn-withdraw base-cyber-btn" onclick="openBaseModal('withdraw')"
+            title="Withdraw USDC or ETH from Base Vault">
+            <svg class="cyber-btn-svg" viewBox="0 0 260 52" fill="none" preserveAspectRatio="none">
+              <defs>
+                <filter id="base-with-glow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="3.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+                <linearGradient id="base-with-border-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#00f0ff" />
+                  <stop offset="25%" stop-color="#38bdf8" />
+                  <stop offset="50%" stop-color="#3b82f6" />
+                  <stop offset="75%" stop-color="#0052ff" />
+                  <stop offset="100%" stop-color="#00f0ff" />
+                </linearGradient>
+                <linearGradient id="base-with-bg-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#09182f" />
+                  <stop offset="100%" stop-color="#060c18" />
+                </linearGradient>
+              </defs>
+
+              <!-- Notched Tech Bezel Body -->
+              <path
+                d="M 18,3 L 80,3 L 86,7 L 174,7 L 180,3 L 242,3 C 251,3 257,8 257,17 L 257,35 C 257,44 251,49 242,49 L 180,49 L 174,45 L 86,45 L 80,49 L 18,49 C 9,49 3,44 3,35 L 3,17 C 3,8 9,3 18,3 Z"
+                fill="url(#base-with-bg-grad)" stroke="url(#base-with-border-grad)" stroke-width="2"
+                filter="url(#base-with-glow)" />
+
+              <!-- Cyber Portal Waves / Vortex lines Left -->
+              <path d="M 7,13 C 17,17 21,33 32,38 M 15,9 C 25,13 29,37 40,42" stroke="#38bdf8" stroke-width="2"
+                stroke-linecap="round" filter="url(#base-with-glow)" opacity="0.9" />
+
+              <!-- Cyber Portal Waves / Vortex lines Right -->
+              <path d="M 253,13 C 243,17 239,33 228,38 M 245,9 C 235,13 231,37 220,42" stroke="#60a5fa" stroke-width="2"
+                stroke-linecap="round" filter="url(#base-with-glow)" opacity="0.9" />
+            </svg>
+            <span class="cyber-btn-text" style="color: #60a5fa;">Withdraw</span>
+          </button>
+        </div>
+
+        <!-- Vault Footer Row -->
+        <div class="vault-footer-row">
+          <div class="vault-footer-lock">
+            <span>🔒</span>
+            <span>Local Encrypted Vault</span>
+          </div>
+          <a class="vault-ledger-link base-ledger-link" id="link-base-card-explorer" href="https://basescan.org/" target="_blank"
+            title="Open Wallet on BaseScan Explorer">
+            <span>Base Explorer ↗</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Exchange Trading Cockpit (Spot Limit Order on Top, Full-Width Orderbook Below) -->
+    <div class="exchange-trading-grid">
+      <!-- Spot Limit Order Form (Cockpit Telemetry Aesthetic) -->
+      <div class="exchange-trade-card" id="trade-order-card">
+        <div class="trade-card-header">
+          <div class="trade-header-left">
+            <div class="trade-card-led-bar">
+              <span class="led-pill led-pill-1"></span>
+              <span class="led-pill led-pill-2"></span>
+              <span class="led-pill led-pill-3"></span>
+              <span class="led-pill led-pill-4"></span>
+            </div>
+            <div class="trade-card-title">
+              <span class="trade-title-bolt">⚡</span> Spot Limit Order
+            </div>
+          </div>
+          <div class="trade-header-controls">
+            <!-- Buy / Sell Direction Tabs -->
+            <div class="trade-direction-tabs">
+              <button type="button" class="btn-action active btn-tab-buy" id="dir-buy-tru"
+                onclick="setSwapDirection('buy')">Buy TRU</button>
+              <button type="button" class="btn-action btn-tab-sell" id="dir-sell-tru"
+                onclick="setSwapDirection('sell')">Sell TRU</button>
+            </div>
+
+            <!-- Available Balance Indicator -->
+            <div class="trade-balance-row" id="trade-available-balance">
+              <span>Available:</span>
+              <strong style="color: #38bdf8;" id="trade-avail-amount">0.00 USDC</strong>
+              <span style="color: #fbbf24; margin-left: 2px;">(Base Vault)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="trade-form-body">
+          <!-- 3-Column Responsive Inputs Grid -->
+          <div class="trade-inputs-row">
+            <!-- 1. Price Input -->
+            <div class="input-group">
+              <div class="trade-input-header">
+                <label class="input-label" for="trade-price">Price per 1 TRU</label>
+                <span class="trade-input-hint" id="trade-best-price-hint" onclick="fillBestPrice()">Best Price</span>
+              </div>
+              <div class="input-wrapper trade-mesh-input">
+                <input type="number" step="any" id="trade-price" class="custom-input" placeholder="1.0000"
+                  value="1.0000" oninput="onTradePriceInput()">
+                <span class="input-adornment adornment-usdc">USDC</span>
+              </div>
+            </div>
+
+            <!-- 2. Amount Input -->
+            <div class="input-group">
+              <div class="trade-input-header">
+                <label class="input-label" for="trade-amount-tru">Amount</label>
+              </div>
+              <div class="input-wrapper trade-mesh-input">
+                <input type="number" step="any" id="trade-amount-tru" class="custom-input input-amount-tru" placeholder="0.0000"
+                  oninput="onTradeAmountInput()">
+                <span class="input-adornment adornment-tru">TRU</span>
+              </div>
+              <!-- Percentage Slider under TRU (Visible on Sell TRU) -->
+              <div class="trade-slider-container slider-tru-container hidden-slider" id="slider-tru-container">
+                <div class="trade-slider-track-wrap">
+                  <input type="range" min="0" max="100" value="0" step="1" id="trade-slider-tru" class="trade-pct-slider slider-tru" oninput="onSliderTruInput(this.value)">
+                </div>
+                <div class="trade-slider-marks slider-tru-marks">
+                  <span class="slider-mark" onclick="snapSliderTru(25)">25%</span>
+                  <span class="slider-mark" onclick="snapSliderTru(50)">50%</span>
+                  <span class="slider-mark" onclick="snapSliderTru(75)">75%</span>
+                  <span class="slider-mark" onclick="snapSliderTru(100)">100%</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Total Input -->
+            <div class="input-group">
+              <div class="trade-input-header">
+                <label class="input-label" for="trade-total-usdc">Total</label>
+              </div>
+              <div class="input-wrapper trade-mesh-input">
+                <input type="number" step="any" id="trade-total-usdc" class="custom-input" placeholder="0.00"
+                  oninput="onTradeTotalInput()">
+                <span class="input-adornment adornment-usdc">USDC</span>
+              </div>
+              <!-- Percentage Slider under USDC (Visible on Buy TRU) -->
+              <div class="trade-slider-container slider-usdc-container" id="slider-usdc-container">
+                <div class="trade-slider-track-wrap">
+                  <input type="range" min="0" max="100" value="0" step="1" id="trade-slider-usdc" class="trade-pct-slider slider-usdc" oninput="onSliderUsdcInput(this.value)">
+                </div>
+                <div class="trade-slider-marks slider-usdc-marks">
+                  <span class="slider-mark" onclick="snapSliderUsdc(25)">25%</span>
+                  <span class="slider-mark" onclick="snapSliderUsdc(50)">50%</span>
+                  <span class="slider-mark" onclick="snapSliderUsdc(75)">75%</span>
+                  <span class="slider-mark" onclick="snapSliderUsdc(100)">100%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Action Bar: Allocation Readout on Left, Submit Button on Right -->
+          <div class="trade-bottom-bar">
+            <div class="trade-bottom-info">
+              <span id="trade-pct-hint" class="trade-pct-hint-text"></span>
+            </div>
+
+            <div class="trade-submit-wrapper">
+              <!-- Primary Action Button -->
+              <button class="btn-action btn-swap-buy" id="btn-initiate-swap" onclick="initiateHtlcOffer()">
+                Enter Amount &amp; Price
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Orderbook & Trade History Terminal -->
+      <div class="glass-card tru-vault-card orderbook-mecha-card orderbook-section" id="orderbook-card" style="margin-bottom: 0;">
+        <div class="vault-header orderbook-header">
+          <div class="trade-header-left orderbook-header-left">
+            <div class="trade-card-led-bar" title="Orderbook Telemetry Sync">
+              <span class="led-pill led-pill-1"></span>
+              <span class="led-pill led-pill-2"></span>
+              <span class="led-pill led-pill-3"></span>
+              <span class="led-pill led-pill-4"></span>
+            </div>
+            <div class="trade-card-title orderbook-header-title">
+              <span class="vault-bolt-icon ob-icon">📊</span>
+              <span class="vault-title-text" id="ob-terminal-title">TRU / USDC Spot</span>
+            </div>
+          </div>
+          <div class="filter-tabs orderbook-tabs">
+            <button class="tab-btn ob-tab-btn active" id="tab-book" onclick="setOrderFilter('book')">📊 Book</button>
+            <button class="tab-btn ob-tab-btn" id="tab-asks" onclick="setOrderFilter('asks')">🔴 Asks</button>
+            <button class="tab-btn ob-tab-btn" id="tab-bids" onclick="setOrderFilter('bids')">🟢 Bids</button>
+            <button class="tab-btn ob-tab-btn" id="tab-inprogress" onclick="setOrderFilter('inprogress')" style="border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">🔄 In-Progress <span id="tab-inprogress-badge" class="tab-badge-pill">0</span></button>
+            <button class="tab-btn ob-tab-btn" id="tab-history" onclick="setOrderFilter('history')">📜 History</button>
+          </div>
+        </div>
+
+        <!-- Cyan Laser Light Divider -->
+        <div class="vault-laser-divider ob-laser-divider"></div>
+
+        <!-- Live In-Progress Swaps Tracker Section -->
+        <div id="active-swaps-tracker" class="active-swaps-tracker-panel" style="display: none;">
+          <!-- Dynamically populated by renderActiveSwapsTracker() -->
+        </div>
+
+        <!-- Trade History Cards Section -->
+        <div id="trade-history-container" class="trade-history-panel" style="display: none;">
+          <!-- Dynamically populated by renderTradeHistory() -->
+        </div>
+
+        <!-- Cockpit Inner Table Frame -->
+        <div class="table-container orderbook-frame">
+          <table class="orderbook-table" id="orderbook-table">
+            <colgroup id="orderbook-colgroup">
+              <col style="width: 28%;">
+              <col style="width: 26%;">
+              <col style="width: 26%;">
+              <col style="width: 20%;">
+            </colgroup>
+            <thead>
+              <tr id="orderbook-headers">
+                <th style="text-align: left; padding-left: 10px;">Price (USDC)</th>
+                <th style="text-align: right;">Amount (TRU)</th>
+                <th style="text-align: right;">Total (USDC)</th>
+                <th style="text-align: center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="orderbook-rows">
+              <tr>
+                <td colspan="4" style="text-align: center; color: var(--text-dim); padding: 30px;">
+                  Scanning orderbook...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Vault Manager Modal -->
+  <div class="modal-backdrop" id="vault-modal">
+    <div class="modal-card">
+      <div class="modal-tabs">
+        <button class="modal-tab-btn active" id="vtab-btn-deposit" onclick="switchVaultTab('deposit')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -1px;">
+            <path d="M17 7L7 17M7 7v10h10" />
+          </svg>
+          Deposit
+        </button>
+        <button class="modal-tab-btn" id="vtab-btn-withdraw" onclick="switchVaultTab('withdraw')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00f0ff" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -1px;">
+            <path d="M7 17L17 7M7 7h10v10" />
+          </svg>
+          Withdraw
+        </button>
+        <button class="modal-tab-btn" id="vtab-btn-utxos" onclick="switchVaultTab('utxos')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffb800" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -1px;">
+            <circle cx="6" cy="6" r="3" />
+            <circle cx="18" cy="6" r="3" />
+            <circle cx="12" cy="18" r="3" />
+            <line x1="8.5" y1="7.5" x2="15.5" y2="7.5" />
+            <line x1="7.5" y1="8.5" x2="10.5" y2="15.5" />
+            <line x1="16.5" y1="8.5" x2="13.5" y2="15.5" />
+          </svg>
+          UTXO Tracker
+        </button>
+        <button class="modal-tab-btn" id="vtab-btn-export" onclick="switchVaultTab('export')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -1px;">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          Export Keys
+        </button>
+      </div>
+
+      <!-- Tab: Deposit -->
+      <div class="modal-tab-pane active" id="vtab-pane-deposit">
+        <div class="vault-pane-inner">
+          <div class="mecha-qr-frame">
+            <div id="vault-qrcode" class="mecha-qr-canvas"></div>
+          </div>
+
+          <div style="width: 100%;">
+            <label class="mecha-field-label">Your TRU Address (Mainnet)</label>
+            <div class="mecha-addr-track">
+              <span class="mecha-addr-code" id="modal-tru-address">Loading...</span>
+              <button class="mecha-copy-btn" onclick="copyTruAddress()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copy
+              </button>
+            </div>
+          </div>
+
+          <div class="mecha-info-slot">
+            <span style="font-size: 1.1rem; flex-shrink: 0;">💡</span>
+            <span>Incoming deposits are automatically detected from the network and credited into your UTXO set.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Withdraw -->
+      <div class="modal-tab-pane" id="vtab-pane-withdraw">
+        <div class="vault-pane-inner">
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div class="input-group" style="margin-bottom: 0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="mecha-field-label" style="margin-bottom: 0;">Destination TRU Address</label>
+                <div class="addr-header-actions">
+                  <button type="button" class="addr-action-btn" onclick="pasteAddress('modal-withdraw-dest')" title="Paste TRU address from clipboard">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                    </svg>
+                    <span>Paste</span>
+                  </button>
+                  <button type="button" class="addr-action-btn" onclick="openQrScanner('modal-withdraw-dest', 'TRU')" title="Scan QR Code with Camera">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                      <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                      <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                      <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                      <rect x="7" y="7" width="10" height="10" rx="1"></rect>
+                    </svg>
+                    <span>Scan QR</span>
+                  </button>
+                </div>
+              </div>
+              <input type="text" id="modal-withdraw-dest" placeholder="T . . ."
+                oninput="validateWithdrawInput()">
+              <div id="modal-dest-hint" style="font-size: 0.74rem; color: #94a3b8; margin-top: 5px;">Must start
+                with 'T' (Mainnet Base58Check)</div>
+            </div>
+            <div class="input-group" style="margin-bottom: 0;">
+              <div
+                style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; flex-wrap: wrap; gap: 4px;">
+                <label class="mecha-field-label" style="margin-bottom: 0;">Amount (TRU)</label>
+                <div style="display: flex; align-items: baseline; gap: 6px;">
+                  <span style="font-size: 0.76rem; color: var(--accent-cyan); cursor: pointer;"
+                    onclick="setMaxWithdraw()">Available: <strong id="modal-avail-bal">0.00000000 TRU</strong>
+                    (Max)</span>
+                  <span id="modal-unconf-note" style="display: none; font-size: 0.72rem; color: var(--tru-gold);"></span>
+                </div>
+              </div>
+              <div class="input-wrapper">
+                <input type="number" step="any" id="modal-withdraw-amount" class="custom-input" placeholder="0.00"
+                  oninput="validateWithdrawInput()">
+                <span class="input-adornment">TRU</span>
+              </div>
+              <div class="quick-pct-row">
+                <button type="button" class="quick-pct-btn" onclick="setWithdrawPercent(0.25)">25%</button>
+                <button type="button" class="quick-pct-btn" onclick="setWithdrawPercent(0.50)">50%</button>
+                <button type="button" class="quick-pct-btn" onclick="setWithdrawPercent(0.75)">75%</button>
+                <button type="button" class="quick-pct-btn highlight" onclick="setMaxWithdraw()">MAX</button>
+              </div>
+            </div>
+            <div class="modal-breakdown-box" style="margin-bottom: 0;">
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                  <span style="color: #94a3b8; font-size: 0.82rem; font-weight: 500; white-space: nowrap;">Network Fee:</span>
+                  <span style="font-family: var(--font-mono); font-weight: 700; color: #ffb800; font-size: 0.82rem; text-align: right;"
+                    id="modal-fee-atoms-text">0.00000498 TRU</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                  <span style="color: #ffffff; font-size: 0.82rem; font-weight: 700; white-space: nowrap;">Total Deducted:</span>
+                  <span style="font-family: var(--font-mono); font-weight: 700; color: #cbd5e1; font-size: 0.82rem; text-align: right;"
+                    id="modal-withdraw-net">0.00000000 TRU</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding: 4px 2px 2px 2px;">
+            <button class="modal-submit-btn" id="btn-modal-do-withdraw" onclick="submitVaultWithdraw()">
+              Broadcast Withdrawal
+            </button>
+            <div id="modal-withdraw-status"
+              style="margin-top: 8px; font-size: 0.78rem; padding: 8px 12px; border-radius: 8px; display: none; line-height: 1.35; word-break: break-all;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: UTXO Tracker -->
+      <div class="modal-tab-pane" id="vtab-pane-utxos">
+        <div class="vault-pane-inner">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div style="font-size: 0.82rem; font-weight: 600; color: #94a3b8;">
+              Verified UTXOs: <strong style="color: #ffb800; font-family: var(--font-mono); font-weight: 700;" id="utxo-tracker-count">0</strong>
+            </div>
+          </div>
+          <div class="utxo-table-container">
+            <table class="utxo-table">
+              <thead>
+                <tr>
+                  <th style="text-align: center;">OUTPOINT</th>
+                  <th style="text-align: center;">HEIGHT</th>
+                  <th style="text-align: center;">AMOUNT</th>
+                  <th style="text-align: center;">STATUS</th>
+                </tr>
+              </thead>
+              <tbody id="utxo-table-body">
+                <tr>
+                  <td colspan="4" style="text-align: center; color: var(--text-dim); padding: 30px;">Scanning verified
+                    chain for UTXOs...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Export Keys & Mnemonic -->
+      <div class="modal-tab-pane" id="vtab-pane-export">
+        <div class="vault-pane-inner" style="padding-top: 4px;">
+          <div class="mecha-security-banner">
+            <span class="mecha-sec-icon">⚠️</span>
+            <div class="mecha-sec-body">
+              <strong>SECURITY NOTICE:</strong> Never share your private key or seed phrase with anyone. Anyone with access can steal your funds.
+            </div>
+          </div>
+
+          <div id="export-loading-box"
+            style="text-align: center; padding: 24px; color: var(--text-dim); display: none;">
+            <div style="font-size: 1.05rem; margin-bottom: 8px; color: var(--tru-gold);">⏳ Loading credentials...</div>
+            <div style="font-size: 0.78rem;">Authenticated using current session token.</div>
+          </div>
+
+          <div id="export-error-box"
+            style="display: none; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; padding: 12px; border-radius: 8px; font-size: 0.82rem; margin-bottom: 12px;">
+          </div>
+
+          <div id="export-content-container">
+            <!-- 1. Public Address -->
+            <div class="mecha-export-group">
+              <div class="mecha-export-header">
+                <span class="mecha-export-label">TRU Public Address (Base58Check)</span>
+                <button class="mecha-mini-btn" onclick="copyExportField('address', '✓ TRU Address copied!')">📋 Copy</button>
+              </div>
+              <div class="mecha-export-track">
+                <span class="mecha-export-text" id="export-addr-val" style="color: #00f0ff; font-weight: 700;">Loading...</span>
+              </div>
+            </div>
+
+            <!-- 2. Private Key (Hex) -->
+            <div class="mecha-export-group">
+              <div class="mecha-export-header">
+                <span class="mecha-export-label">Private Key (32-Byte Hex)</span>
+                <div style="display: flex; gap: 6px;">
+                  <button class="mecha-mini-btn" id="btn-toggle-privhex" onclick="toggleExportReveal('privhex')">👁 Show</button>
+                  <button class="mecha-mini-btn" onclick="copyExportField('privhex', '✓ Private Key (Hex) copied!')">📋 Copy</button>
+                </div>
+              </div>
+              <div class="mecha-export-track">
+                <span class="mecha-export-text export-blur" id="export-privhex-val">••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••</span>
+              </div>
+            </div>
+
+            <!-- 3. Private Key (WIF) -->
+            <div class="mecha-export-group">
+              <div class="mecha-export-header">
+                <span class="mecha-export-label">Private Key (WIF Format)</span>
+                <div style="display: flex; gap: 6px;">
+                  <button class="mecha-mini-btn" id="btn-toggle-privwif" onclick="toggleExportReveal('privwif')">👁 Show</button>
+                  <button class="mecha-mini-btn" onclick="copyExportField('privwif', '✓ WIF Private Key copied!')">📋 Copy</button>
+                </div>
+              </div>
+              <div class="mecha-export-track">
+                <span class="mecha-export-text export-blur" id="export-privwif-val">••••••••••••••••••••••••••••••••••••••••••••••••••••</span>
+              </div>
+            </div>
+
+            <!-- 4. BIP-39 Seed Phrase -->
+            <div class="mecha-export-group">
+              <div class="mecha-export-header">
+                <span class="mecha-export-label">BIP-39 Mnemonic Seed Phrase (24 Words)</span>
+                <div style="display: flex; gap: 6px;">
+                  <button class="mecha-mini-btn" id="btn-toggle-mnemonic" onclick="toggleExportReveal('mnemonic')">👁 Show Words</button>
+                  <button class="mecha-mini-btn" onclick="copyExportField('mnemonic', '✓ 24-word Seed Phrase copied!')">📋 Copy Phrase</button>
+                </div>
+              </div>
+              <div class="mecha-export-track multi-line tru-mnemonic-track">
+                <span class="mecha-export-text multi-line export-blur" id="export-mnemonic-val">•••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• ••••</span>
+              </div>
+            </div>
+
+            <!-- 5. Base Address -->
+            <div class="mecha-export-group">
+              <div class="mecha-export-header">
+                <span class="mecha-export-label">Base EVM Address (EIP-55)</span>
+                <button class="mecha-mini-btn" onclick="copyExportField('base_address', '✓ Base Address copied!')">📋 Copy</button>
+              </div>
+              <div class="mecha-export-track">
+                <span class="mecha-export-text" id="export-base-addr-val" style="color: #38bdf8; font-weight: 700;">Loading...</span>
+              </div>
+            </div>
+
+            <!-- 6. Base Private Key (Hex) -->
+            <div class="mecha-export-group" style="margin-bottom: 0;">
+              <div class="mecha-export-header">
+                <span class="mecha-export-label">Base Private Key (EVM Hex)</span>
+                <div style="display: flex; gap: 6px;">
+                  <button class="mecha-mini-btn" id="btn-toggle-base-priv" onclick="toggleExportReveal('base_priv')">👁 Show</button>
+                  <button class="mecha-mini-btn" onclick="copyExportField('base_priv', '✓ Base Private Key copied!')">📋 Copy</button>
+                </div>
+              </div>
+              <div class="mecha-export-track">
+                <span class="mecha-export-text export-blur" id="export-base-priv-val">••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Base Vault Manager Modal (Independent, 1:1 Mirror of TRU Vault Modal) -->
+  <div class="modal-backdrop" id="base-vault-modal" onclick="if(event.target===this)closeBaseModal()">
+    <div class="modal-card">
+      <div class="modal-tabs">
+        <button class="modal-tab-btn active" id="btab-btn-deposit" onclick="switchBaseTab('deposit')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -1px;">
+            <path d="M17 7L7 17M7 7v10h10" />
+          </svg>
+          Deposit
+        </button>
+        <button class="modal-tab-btn" id="btab-btn-withdraw" onclick="switchBaseTab('withdraw')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00f0ff" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -1px;">
+            <path d="M7 17L17 7M7 7h10v10" />
+          </svg>
+          Withdraw
+        </button>
+        <button class="modal-tab-btn" id="btab-btn-explorer" onclick="switchBaseTab('explorer')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -1px;">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="2" y1="12" x2="22" y2="12" />
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+          </svg>
+          Base Explorer
+        </button>
+        <button class="modal-tab-btn" id="btab-btn-export" onclick="switchBaseTab('export')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -1px;">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          Export Keys
+        </button>
+      </div>
+
+      <!-- Tab: Deposit -->
+      <div class="modal-tab-pane active" id="btab-pane-deposit">
+        <div class="vault-pane-inner">
+          <div class="mecha-qr-frame">
+            <div id="base-vault-qrcode" class="mecha-qr-canvas"></div>
+          </div>
+
+          <div style="width: 100%;">
+            <label class="mecha-field-label">Your Base Address (<span id="base-deposit-net-label">EVM</span>)</label>
+            <div class="mecha-addr-track">
+              <span class="mecha-addr-code" id="modal-base-address">Loading...</span>
+              <button class="mecha-copy-btn" onclick="copyBaseAddress()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copy
+              </button>
+            </div>
+          </div>
+
+          <div class="mecha-info-slot">
+            <span style="font-size: 1.1rem; flex-shrink: 0;">💡</span>
+            <span>Send <strong id="base-deposit-usdc-label">Base USDC</strong> (to trade) and a tiny amount of <strong id="base-deposit-eth-label">ETH</strong> (e.g. 0.002 ETH for gas). Deposits are automatically detected and credited into your vault.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Withdraw -->
+      <div class="modal-tab-pane" id="btab-pane-withdraw">
+        <div class="vault-pane-inner">
+          <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+            <!-- Asset Selection (USDC vs ETH) -->
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="quick-pct-btn highlight" id="btn-base-asset-usdc" onclick="setBaseWithdrawAsset('USDC')" style="flex: 1; padding: 8px 12px; font-weight: 700;">
+                USDC (<span id="modal-base-usdc-avail">0.00</span>)
+              </button>
+              <button type="button" class="quick-pct-btn" id="btn-base-asset-eth" onclick="setBaseWithdrawAsset('ETH')" style="flex: 1; padding: 8px 12px; font-weight: 700;">
+                ETH (<span id="modal-base-eth-avail">0.000000</span>)
+              </button>
+            </div>
+
+            <div class="input-group" style="margin-bottom: 0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="mecha-field-label" style="margin-bottom: 0;">Destination Base Address (EVM)</label>
+                <div class="addr-header-actions">
+                  <button type="button" class="addr-action-btn addr-action-btn-base" onclick="pasteAddress('base-withdraw-dest')" title="Paste Base address from clipboard">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                    </svg>
+                    <span>Paste</span>
+                  </button>
+                  <button type="button" class="addr-action-btn addr-action-btn-base" onclick="openQrScanner('base-withdraw-dest', 'Base (EVM)')" title="Scan QR Code with Camera">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                      <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                      <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                      <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                      <rect x="7" y="7" width="10" height="10" rx="1"></rect>
+                    </svg>
+                    <span>Scan QR</span>
+                  </button>
+                </div>
+              </div>
+              <input type="text" id="base-withdraw-dest" placeholder="0x . . ." oninput="validateBaseWithdrawInput()">
+              <div id="base-dest-hint" style="font-size: 0.74rem; color: #94a3b8; margin-top: 3px;">Must start with '0x' (42 characters EVM)</div>
+            </div>
+
+            <div class="input-group" style="margin-bottom: 0;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; flex-wrap: gap 4px;">
+                <label class="mecha-field-label" style="margin-bottom: 0;">Amount (<span id="base-withdraw-asset-label">USDC</span>)</label>
+                <div style="display: flex; align-items: baseline; gap: 6px;">
+                  <span style="font-size: 0.76rem; color: #38bdf8; cursor: pointer;" onclick="setBaseWithdrawMax()">Available: <strong id="base-modal-avail-bal">0.00 USDC</strong> (Max)</span>
+                </div>
+              </div>
+              <div class="input-wrapper">
+                <input type="number" step="any" id="base-withdraw-amount" class="custom-input" placeholder="0.00" oninput="validateBaseWithdrawInput()">
+                <span class="input-adornment" id="base-withdraw-adornment">USDC</span>
+              </div>
+              <div class="quick-pct-row">
+                <button type="button" class="quick-pct-btn" onclick="setBaseWithdrawPercent(0.25)">25%</button>
+                <button type="button" class="quick-pct-btn" onclick="setBaseWithdrawPercent(0.50)">50%</button>
+                <button type="button" class="quick-pct-btn" onclick="setBaseWithdrawPercent(0.75)">75%</button>
+                <button type="button" class="quick-pct-btn highlight" onclick="setBaseWithdrawMax()">MAX</button>
+              </div>
+            </div>
+
+            <div class="modal-breakdown-box" style="margin-bottom: 0;">
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                  <span style="color: #94a3b8; font-size: 0.82rem; font-weight: 500; white-space: nowrap;">Network Gas (L2):</span>
+                  <span id="base-withdraw-gas-fee" style="font-family: var(--font-mono); font-weight: 700; color: #38bdf8; font-size: 0.82rem; text-align: right;">Calculating...</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                  <span style="color: #ffffff; font-size: 0.82rem; font-weight: 700; white-space: nowrap;">Broadcast Source:</span>
+                  <span style="font-family: var(--font-mono); font-weight: 700; color: #cbd5e1; font-size: 0.82rem; text-align: right;">Local Vault Signer</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 4px 2px 2px 2px; width: 100%;">
+            <button class="modal-submit-btn" id="btn-base-do-withdraw" onclick="submitBaseWithdraw()">
+              Broadcast Base Withdrawal
+            </button>
+            <div id="base-withdraw-status" style="margin-top: 8px; font-size: 0.78rem; padding: 8px 12px; border-radius: 8px; display: none; line-height: 1.35; word-break: break-all;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Explorer / Verified Contracts -->
+      <div class="modal-tab-pane" id="btab-pane-explorer">
+        <div class="vault-pane-inner">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; width: 100%;">
+            <div style="font-size: 0.82rem; font-weight: 600; color: #94a3b8;">
+              Network: <strong id="base-network-info" style="color: #38bdf8; font-family: var(--font-mono); font-weight: 700;">Base (8453)</strong>
+            </div>
+            <div style="font-size: 0.78rem; color: #34d399; font-weight: 700;">● Online</div>
+          </div>
+
+          <div class="mecha-export-group" style="width: 100%;">
+            <div class="mecha-export-header">
+              <span class="mecha-export-label">Your Base Address</span>
+              <a id="link-basescan-addr" href="https://basescan.org/" target="_blank" class="mecha-mini-btn" style="text-decoration: none;">BaseScan ↗</a>
+            </div>
+            <div class="mecha-export-track">
+              <span class="mecha-export-text" id="explorer-base-address" style="color: #38bdf8; font-weight: 700;">Loading...</span>
+            </div>
+          </div>
+
+          <div class="mecha-export-group" style="width: 100%;">
+            <div class="mecha-export-header">
+              <span class="mecha-export-label">BaseHTLC Smart Contract</span>
+              <a id="link-basescan-htlc" href="https://basescan.org/" target="_blank" class="mecha-mini-btn" style="text-decoration: none;">View Contract ↗</a>
+            </div>
+            <div class="mecha-export-track">
+              <span class="mecha-export-text" id="explorer-htlc-address" style="color: #cbd5e1;">0x0000000000000000000000000000000000000000</span>
+            </div>
+          </div>
+
+          <div class="mecha-export-group" style="width: 100%;">
+            <div class="mecha-export-header">
+              <span class="mecha-export-label" id="explorer-usdc-label">Official USDC (Circle)</span>
+              <a id="link-basescan-usdc" href="https://basescan.org/token/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" target="_blank" class="mecha-mini-btn" style="text-decoration: none;">View Token ↗</a>
+            </div>
+            <div class="mecha-export-track">
+              <span class="mecha-export-text" id="explorer-usdc-address" style="color: #cbd5e1;">0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913</span>
+            </div>
+          </div>
+
+          <div class="mecha-info-slot" style="margin-top: 8px;">
+            <span style="font-size: 1.1rem; flex-shrink: 0;">⚡</span>
+            <span>All HTLC locks, secrets, claims and refunds on <span id="base-footer-net-name">Base</span> are verifiable in real-time on BaseScan.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Export Keys -->
+      <div class="modal-tab-pane" id="btab-pane-export">
+        <div class="vault-pane-inner" style="padding-top: 4px;">
+          <div class="mecha-security-banner">
+            <span class="mecha-sec-icon">⚠️</span>
+            <div class="mecha-sec-body">
+              <strong>SECURITY NOTICE:</strong> Never share your Base private key with anyone. It gives full access to your Base USDC and ETH.
+            </div>
+          </div>
+
+          <div id="base-export-loading-box" style="text-align: center; padding: 24px; color: var(--text-dim); display: none;">
+            <div style="font-size: 1.05rem; margin-bottom: 8px; color: #38bdf8;">⏳ Loading credentials...</div>
+            <div style="font-size: 0.78rem;">Authenticated using current session token.</div>
+          </div>
+
+          <div id="base-export-error-box" style="display: none; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; padding: 12px; border-radius: 8px; font-size: 0.82rem; margin-bottom: 12px;"></div>
+
+          <div id="base-export-content-container" style="width: 100%;">
+            <!-- 1. Public Address -->
+            <div class="mecha-export-group">
+              <div class="mecha-export-header">
+                <span class="mecha-export-label">Base EVM Address (EIP-55)</span>
+                <button class="mecha-mini-btn" onclick="copyBaseExportField('address', '✓ Base Address copied!')">📋 Copy</button>
+              </div>
+              <div class="mecha-export-track">
+                <span class="mecha-export-text" id="base-export-addr-val" style="color: #38bdf8; font-weight: 700;">Loading...</span>
+              </div>
+            </div>
+
+            <!-- 2. Base Private Key (Hex) -->
+            <div class="mecha-export-group">
+              <div class="mecha-export-header">
+                <span class="mecha-export-label">Base Private Key (EVM Hex)</span>
+                <div style="display: flex; gap: 6px;">
+                  <button class="mecha-mini-btn" id="btn-toggle-base-priv-modal" onclick="toggleBaseExportReveal('priv')">👁 Show</button>
+                  <button class="mecha-mini-btn" onclick="copyBaseExportField('priv', '✓ Base Private Key copied!')">📋 Copy</button>
+                </div>
+              </div>
+              <div class="mecha-export-track">
+                <span class="mecha-export-text export-blur" id="base-export-priv-val">••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••</span>
+              </div>
+            </div>
+
+            <!-- 3. BIP-39 Seed Phrase (12 Words) -->
+            <div class="mecha-export-group">
+              <div class="mecha-export-header">
+                <span class="mecha-export-label">BIP-39 Mnemonic Seed Phrase (12 Words)</span>
+                <div style="display: flex; gap: 6px;">
+                  <button class="mecha-mini-btn" id="btn-toggle-base-mnemonic" onclick="toggleBaseExportReveal('mnemonic')">👁 Show Words</button>
+                  <button class="mecha-mini-btn" onclick="copyBaseExportField('mnemonic', '✓ 12-word Seed Phrase copied!')">📋 Copy Phrase</button>
+                </div>
+              </div>
+              <div class="mecha-export-track multi-line base-mnemonic-track">
+                <span class="mecha-export-text multi-line export-blur" id="base-export-mnemonic-val">•••• •••• •••• •••• •••• •••• •••• •••• •••• •••• •••• ••••</span>
+              </div>
+            </div>
+
+            <div class="mecha-info-slot" style="margin-top: 14px;">
+              <span style="font-size: 1.1rem; flex-shrink: 0;">🔒</span>
+              <span>All keys and seed phrases are stored locally in your encrypted <code>vault.dat</code>. You can also import your Base private key into external EVM wallets to manage funds.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Take Order / Swap Execution Modal (Matches Vault Modal Outside-Click Closing & Mecha Cockpit Mockup) -->
+  <div class="modal-backdrop take-order-backdrop" id="modal-take-order" style="display: none;">
+    <div class="modal-card take-order-modal-card">
+      <!-- 5-segment Status Indicator Bar -->
+      <div class="take-modal-track-container">
+        <div class="take-modal-track-segment seg-green"></div>
+        <div class="take-modal-track-segment seg-yellow"></div>
+        <div class="take-modal-track-segment seg-orange"></div>
+        <div class="take-modal-track-segment seg-red"></div>
+        <div class="take-modal-track-segment seg-dark"></div>
+      </div>
+
+      <!-- Header with Lightning Bolt, NO close button (closes on outside click) -->
+      <div class="take-modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="take-modal-header-icon">⚡</span>
+          <h2 class="take-modal-header-title" id="take-modal-title">Sell TRU</h2>
+        </div>
+      </div>
+
+      <!-- Glowing Cyan Amounts Card -->
+      <div class="take-modal-amounts-box">
+        <div class="take-modal-amount-row">
+          <span class="take-modal-amount-label" id="take-modal-pay-label">YOU SEND (TRU)</span>
+          <span class="take-modal-amount-val-send" id="take-modal-pay-amount">29.0000 TRU</span>
+        </div>
+        <div class="take-modal-amount-row">
+          <span class="take-modal-amount-label" id="take-modal-receive-label">YOU RECEIVE (USDC ON BASE)</span>
+          <span class="take-modal-amount-val-recv" id="take-modal-receive-amount">29.00 USDC</span>
+        </div>
+      </div>
+
+      <!-- Metadata Details -->
+      <div class="take-modal-details-grid">
+        <div class="take-modal-detail-row">
+          <span class="take-modal-detail-label">Maker Beneficiary</span>
+          <span class="take-modal-pill-badge" id="take-modal-beneficiary">0x0000...0000</span>
+        </div>
+        <div class="take-modal-detail-row">
+          <span class="take-modal-detail-label">Your Receiving Vault</span>
+          <span class="take-modal-detail-val val-gold" id="take-modal-vault-addr">Loading...</span>
+        </div>
+        <div class="take-modal-detail-row">
+          <span class="take-modal-detail-label">Cryptographic Hashlock</span>
+          <span class="take-modal-detail-val val-slate" id="take-modal-hashlock">0x6f5c832dc4...09d6a9fc</span>
+        </div>
+        <div class="take-modal-detail-row">
+          <span class="take-modal-detail-label">Estimated Rate</span>
+          <span class="take-modal-detail-val val-cyan" id="take-modal-rate">1 TRU = 1.0000 USDC</span>
+        </div>
+      </div>
+
+      <!-- Action Step Status -->
+      <div id="take-modal-status-box" style="display: none; background: rgba(0,0,0,0.5); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 0.85rem; color: #fbbf24; border-left: 3px solid #fbbf24;">
+        <span id="take-modal-status-text">Processing...</span>
+      </div>
+
+      <!-- Green Autonomous Swap Callout Banner -->
+      <div class="take-modal-callout">
+        <span class="take-modal-callout-icon">⚡</span>
+        <div class="take-modal-callout-text">
+          <strong style="color: #6ee7b7;">Headless Autonomous Swap:</strong> Executes instantly from your proxy vault.<br>
+          Strict ConfirmationGuard (≥6 TRU blocks) enabled.
+        </div>
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="take-modal-footer">
+        <button type="button" class="take-modal-btn-cancel" onclick="closeTakeOrderModal()">Cancel</button>
+        <button type="button" class="cyber-btn take-swap-cyber-btn" id="btn-confirm-take-swap" onclick="confirmExecuteTakeSwap()">
+          <svg class="cyber-btn-svg" viewBox="0 0 260 52" fill="none" preserveAspectRatio="none">
+            <defs>
+              <filter id="take-cyber-neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="3.5" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <linearGradient id="take-border-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#00f0ff" />
+                <stop offset="35%" stop-color="#00d2ff" />
+                <stop offset="65%" stop-color="#f59e0b" />
+                <stop offset="100%" stop-color="#ff9800" />
+              </linearGradient>
+              <linearGradient id="take-bg-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#111726" />
+                <stop offset="100%" stop-color="#090d15" />
+              </linearGradient>
+            </defs>
+
+            <!-- Notched Tech Bezel Body (Exact TRU Vault Bezel) -->
+            <path
+              d="M 18,3 L 80,3 L 86,7 L 174,7 L 180,3 L 242,3 C 251,3 257,8 257,17 L 257,35 C 257,44 251,49 242,49 L 180,49 L 174,45 L 86,45 L 80,49 L 18,49 C 9,49 3,44 3,35 L 3,17 C 3,8 9,3 18,3 Z"
+              fill="url(#take-bg-grad)" stroke="url(#take-border-grad)" stroke-width="2"
+              filter="url(#take-cyber-neon-glow)" />
+
+            <!-- Cyber Portal Waves / Vortex lines Left (Cyan) -->
+            <path d="M 7,13 C 17,17 21,33 32,38 M 15,9 C 25,13 29,37 40,42" stroke="#00f0ff" stroke-width="2"
+              stroke-linecap="round" filter="url(#take-cyber-neon-glow)" opacity="0.95" />
+
+            <!-- Cyber Portal Waves / Vortex lines Right (Amber) -->
+            <path d="M 253,13 C 243,17 239,33 228,38 M 245,9 C 235,13 231,37 220,42" stroke="#ff9800" stroke-width="2"
+              stroke-linecap="round" filter="url(#take-cyber-neon-glow)" opacity="0.95" />
+          </svg>
+          <span class="cyber-btn-text" id="btn-take-swap-text">Sell 29.0000 TRU</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Built-in TRU Explorer Transaction Details Modal -->
+  <div id="tru-tx-modal" class="modal-backdrop" style="display: none;" onclick="if(event.target === this) closeTruTxModal();" aria-hidden="true">
+    <div class="modal-card tru-tx-modal-card" role="dialog" aria-modal="true" aria-labelledby="tru-tx-modal-title">
+      <!-- 5-segment Status Indicator Bar -->
+      <div class="take-modal-track-container" style="margin-bottom: 14px;">
+        <div class="take-modal-track-segment seg-green"></div>
+        <div class="take-modal-track-segment seg-yellow"></div>
+        <div class="take-modal-track-segment seg-orange"></div>
+        <div class="take-modal-track-segment seg-red"></div>
+        <div class="take-modal-track-segment seg-dark"></div>
+      </div>
+
+      <div class="tru-tx-modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.25rem; color: var(--tru-gold); filter: drop-shadow(0 0 8px rgba(255, 184, 0, 0.5));">⚡</span>
+          <h2 id="tru-tx-modal-title" style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #ffffff; font-family: var(--font-sans); letter-spacing: 0.2px;">TRU Transaction Details</h2>
+        </div>
+        <button type="button" class="mecha-mini-btn" onclick="closeTruTxModal()" aria-label="Close" style="height: 26px; padding: 0 10px; cursor: pointer;">
+          ✕ Close
+        </button>
+      </div>
+
+      <div id="tru-tx-modal-body" class="tru-tx-modal-body">
+        <!-- Injected via openTruTxModal -->
+      </div>
+    </div>
+  </div>
+
+  <!-- P2P Autonomous Engine | Process Audit Modal -->
+  <div id="automation-audit-modal" class="modal-backdrop audit-modal-backdrop">
+    <div class="audit-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="audit-modal-title">
+      <div class="audit-modal-led-bar">
+        <span class="led-pill led-pill-1"></span>
+        <span class="led-pill led-pill-2"></span>
+        <span class="led-pill led-pill-3"></span>
+        <span class="led-pill led-pill-4"></span>
+        <span class="led-pill led-pill-5"></span>
+      </div>
+      <div class="audit-modal-header">
+        <div class="audit-header-title-group">
+          <span class="audit-header-icon">🤖</span>
+          <div>
+            <div class="audit-header-title" id="audit-modal-title">P2P Autonomous Engine | Process Audit</div>
+            <div class="audit-header-subtitle" id="audit-modal-subtitle">Trustless Atomic Swap State &amp; Telemetry</div>
+          </div>
+        </div>
+        <button type="button" class="audit-modal-close-btn" id="audit-modal-close-btn" onclick="closeAutomationAuditModal()" title="Close (Esc)" aria-label="Close">✕</button>
+      </div>
+
+      <div class="audit-modal-body">
+        <div class="audit-timeline">
+          <div class="audit-timeline-title">
+            <span>Automated Execution Pipeline (5 Stages)</span>
+            <span id="audit-stage-status-badge" style="font-family: var(--font-mono); color: #00c8e0; font-weight: 800;">ACTIVE</span>
+          </div>
+          <div id="audit-timeline-steps"></div>
+        </div>
+
+        <div class="audit-console-wrap">
+          <div class="audit-console-bar">
+            <span class="audit-console-heading">
+              <span class="tracker-automation-pulse"></span>
+              Event Stream
+            </span>
+            <div class="audit-console-tools">
+              <button type="button" class="audit-tool-btn" id="audit-btn-autoscroll" onclick="toggleAutoScrollLogs()">Auto-Scroll: ON</button>
+              <button type="button" class="audit-tool-btn" id="audit-btn-copy" onclick="copyAutomationLogsToClipboard(event)">📋 Copy Logs</button>
+            </div>
+          </div>
+          <div class="audit-console" id="audit-modal-console"></div>
+        </div>
+      </div>
+
+      <div class="audit-modal-footer">
+        <div class="audit-footer-status">
+          TRU SPV &amp; BaseHTLC Watcher
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR Code Scanner Modal -->
+  <div class="qr-scanner-overlay" id="qr-scanner-modal" style="display: none;" onclick="onQrModalBackdropClick(event)">
+    <div class="qr-scanner-card" onclick="event.stopPropagation()">
+      <div class="qr-scanner-header">
+        <div class="qr-header-title">
+          <span class="qr-header-icon">📷</span>
+          <span>Scan QR Code</span>
+          <span class="qr-target-badge" id="qr-target-badge">Address</span>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="closeQrScanner()" title="Close scanner">&times;</button>
+      </div>
+
+      <div class="qr-scanner-body">
+        <div class="qr-viewport-container" id="qr-viewport-container">
+          <video id="qr-video" playsinline autoplay muted></video>
+          <canvas id="qr-canvas" style="display: none;"></canvas>
+          <img id="qr-camera-stream" style="display: none; width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;" alt="Camera Preview">
+          
+          <div class="qr-viewfinder">
+            <div class="qr-corner qr-corner-tl"></div>
+            <div class="qr-corner qr-corner-tr"></div>
+            <div class="qr-corner qr-corner-bl"></div>
+            <div class="qr-corner qr-corner-br"></div>
+            <div class="qr-laser-line"></div>
+          </div>
+
+          <div class="qr-loading-overlay" id="qr-loading-overlay">
+            <div class="qr-spinner"></div>
+            <span>Starting camera...</span>
+          </div>
+
+          <div class="qr-error-overlay" id="qr-error-overlay" style="display: none;">
+            <span class="qr-error-icon">⚠️</span>
+            <span id="qr-error-text">Camera access unavailable</span>
+            <button type="button" class="qr-retry-btn" onclick="retryQrCamera()">Retry Camera</button>
+          </div>
+        </div>
+
+        <div class="qr-scanner-toolbar">
+          <button type="button" class="qr-tool-btn" id="qr-btn-flip" onclick="flipQrCamera()" title="Switch Front/Back Camera">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 10c0-4.418-3.582-8-8-8s-8 3.582-8 8c0 1.956.703 3.748 1.874 5.143L4 18h5v-5l-1.84 1.84C6.279 13.684 5.8 11.91 5.8 10c0-3.425 2.775-6.2 6.2-6.2s6.2 2.775 6.2 6.2c0 2.21-1.157 4.148-2.9 5.25"></path>
+              <path d="M12 22l4-4h-8l4 4z"></path>
+            </svg>
+            <span>Flip</span>
+          </button>
+
+          <button type="button" class="qr-tool-btn" id="qr-btn-torch" onclick="toggleQrTorch()" title="Toggle Flashlight" style="display: none;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+            </svg>
+            <span id="qr-torch-label">Torch</span>
+          </button>
+
+          <label class="qr-tool-btn qr-file-label" title="Upload QR Code from image file">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            <span>Image</span>
+            <input type="file" id="qr-file-input" accept="image/*" style="display: none;" onchange="onQrFileSelected(event)">
+          </label>
+        </div>
+
+        <div class="qr-hint-text">
+          Point camera at a TRU or Base QR code, or upload an image.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast-msg" id="toast-msg"></div>
+
+  <footer>
+    <div style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;">
+      <span>TRUSWAP v1.0.0 • Atomic Swaps • TRU Community Market</span>
+      <span style="color: var(--card-border);">•</span>
+      <a href="/docs" style="color: var(--accent-cyan); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.22); transition: all 0.2s ease;" onmouseover="this.style.borderColor='var(--accent-cyan)'; this.style.boxShadow='0 0 10px rgba(0,240,255,0.3)';" onmouseout="this.style.borderColor='rgba(0, 240, 255, 0.22)'; this.style.boxShadow='none';" title="Read The TRUSWAP Book — Comprehensive Guide & Architecture">
+        <span style="font-size: 0.95rem;">📖</span>
+        <span>The TRUSWAP Book</span>
+      </a>
+    </div>
+  </footer>
+
+  <!-- Injected Session Token placeholder -->
+  <script>
+    let sessionToken = "";
+    window.sessionToken = sessionToken;
+  </script>
+
+  <!-- Modular Application Scripts -->
+  <script src="/js/config.js"></script>
+  <script src="/js/socket.js"></script>
+  <script src="/js/orderbook.js"></script>
+  <script src="/js/swap.js"></script>
+  <script src="/js/vault.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,12 @@
+[book]
+authors = ["TRUSWAP Core Contributors"]
+language = "en"
+multilingual = false
+src = "."
+title = "The TRUSWAP Book — Comprehensive Guide & Architecture"
+
+[output.html]
+default-theme = "coal"
+preferred-dark-theme = "coal"
+curly-quotes = true
+mathjax-support = true
