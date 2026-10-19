@@ -32,6 +32,17 @@ pub enum ClientMessage {
 
     #[serde(rename = "Ping")]
     Ping,
+
+    #[serde(rename = "Heartbeat")]
+    Heartbeat(HeartbeatPayload),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HeartbeatPayload {
+    #[serde(default)]
+    pub maker_base_address: Option<String>,
+    #[serde(default)]
+    pub maker_tru_address: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

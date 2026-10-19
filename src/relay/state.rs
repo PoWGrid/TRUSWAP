@@ -27,12 +27,18 @@ pub struct HotOrderbookState {
     pub taker_allocations_tru: RwLock<HashMap<String, Vec<TakerAllocation>>>,
     /// Broadcast channel to stream live updates to all connected WebSockets
     pub broadcast_tx: broadcast::Sender<RelayBroadcastEvent>,
+    /// Tracks last communication timestamp from maker: order_id -> Instant
+    pub order_heartbeats: RwLock<HashMap<String, std::time::Instant>>,
+    /// Tracks which orders belong to which WebSocket session: session_id -> Set of order_ids
+    pub session_orders: RwLock<HashMap<u64, HashSet<String>>>,
+    /// Tracks which maker addresses belong to which WebSocket session: session_id -> Set of maker_base_address (lowercase)
+    pub session_makers: RwLock<HashMap<u64, HashSet<String>>>,
 }
 
 impl HotOrderbookState {
     pub fn new() -> Arc<Self> {
         let (broadcast_tx, _) = broadcast::channel(4096);
-        Arc::new(Self {
+        let state = Arc::new(Self {
             orders: RwLock::new(HashMap::new()),
             base_maker_index: RwLock::new(HashMap::new()),
             tru_maker_index: RwLock::new(HashMap::new()),
@@ -40,7 +46,33 @@ impl HotOrderbookState {
             taker_allocations_base: RwLock::new(HashMap::new()),
             taker_allocations_tru: RwLock::new(HashMap::new()),
             broadcast_tx,
-        })
+            order_heartbeats: RwLock::new(HashMap::new()),
+            session_orders: RwLock::new(HashMap::new()),
+            session_makers: RwLock::new(HashMap::new()),
+        });
+
+        // Spawn background heartbeat reaper: if no connection from maker for 60s, prune all their orders
+        let reaper_weak = Arc::downgrade(&state);
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
+            loop {
+                interval.tick().await;
+                if let Some(strong) = reaper_weak.upgrade() {
+                    let pruned = strong.prune_stale_orders(std::time::Duration::from_secs(60)).await;
+                    if !pruned.is_empty() {
+                        tracing::info!(
+                            "[RELAY-HEARTBEAT] Pruned {} stale order(s) due to 60s maker heartbeat timeout: {:?}",
+                            pruned.len(),
+                            pruned
+                        );
+                    }
+                } else {
+                    break;
+                }
+            }
+        });
+
+        state
     }
 
     /// Adds a verified order into the in-memory orderbook and updates all indices
@@ -75,6 +107,11 @@ impl HotOrderbookState {
             evm_set_lock.insert(base_maker);
         }
 
+        {
+            let mut heartbeats = self.order_heartbeats.write().await;
+            heartbeats.insert(order_id, std::time::Instant::now());
+        }
+
         // Notify all subscribers about the new order
         let _ = self
             .broadcast_tx
@@ -91,6 +128,12 @@ impl HotOrderbookState {
         if let Some(ref order) = removed {
             let base_maker = order.maker_base_address.to_lowercase();
             let tru_maker = &order.maker_tru_address;
+
+            // Prune from heartbeats
+            {
+                let mut heartbeats = self.order_heartbeats.write().await;
+                heartbeats.remove(order_id);
+            }
 
             // Prune from base index
             {
@@ -139,6 +182,120 @@ impl HotOrderbookState {
         }
 
         removed
+    }
+
+    /// Registers a newly submitted order with a specific WebSocket session
+    pub async fn register_session_order(&self, session_id: u64, order_id: &str, maker_base: &str) {
+        let clean_base = maker_base.to_lowercase();
+        {
+            let mut session_orders = self.session_orders.write().await;
+            session_orders
+                .entry(session_id)
+                .or_default()
+                .insert(order_id.to_string());
+        }
+        {
+            let mut session_makers = self.session_makers.write().await;
+            session_makers
+                .entry(session_id)
+                .or_default()
+                .insert(clean_base);
+        }
+        {
+            let mut heartbeats = self.order_heartbeats.write().await;
+            heartbeats.insert(order_id.to_string(), std::time::Instant::now());
+        }
+    }
+
+    /// Associates a maker address with an existing WebSocket session (e.g. on client reconnect / heartbeat)
+    pub async fn associate_session_maker(&self, session_id: u64, maker_base: &str) {
+        let clean_base = maker_base.to_lowercase();
+        {
+            let mut session_makers = self.session_makers.write().await;
+            session_makers
+                .entry(session_id)
+                .or_default()
+                .insert(clean_base);
+        }
+        self.touch_session(session_id).await;
+    }
+
+    /// Touches the heartbeat timestamp for all orders associated with a WebSocket session
+    pub async fn touch_session(&self, session_id: u64) {
+        let now = std::time::Instant::now();
+        let direct_orders = {
+            let s_orders = self.session_orders.read().await;
+            s_orders.get(&session_id).cloned().unwrap_or_default()
+        };
+
+        let makers = {
+            let s_makers = self.session_makers.read().await;
+            s_makers.get(&session_id).cloned().unwrap_or_default()
+        };
+
+        let mut all_orders_to_touch = direct_orders;
+        if !makers.is_empty() {
+            let base_idx = self.base_maker_index.read().await;
+            for maker in makers {
+                if let Some(orders) = base_idx.get(&maker) {
+                    for o in orders {
+                        all_orders_to_touch.insert(o.clone());
+                    }
+                }
+            }
+        }
+
+        if !all_orders_to_touch.is_empty() {
+            let mut heartbeats = self.order_heartbeats.write().await;
+            for id in all_orders_to_touch {
+                heartbeats.insert(id, now);
+            }
+        }
+    }
+
+    /// Releases a closed WebSocket session from the tracking structures (orders remain subject to 60s timeout)
+    pub async fn release_session(&self, session_id: u64) {
+        let mut session_orders = self.session_orders.write().await;
+        session_orders.remove(&session_id);
+        let mut session_makers = self.session_makers.write().await;
+        session_makers.remove(&session_id);
+    }
+
+    /// Prunes all orders whose makers have had no communication for longer than `timeout`
+    pub async fn prune_stale_orders(&self, timeout: std::time::Duration) -> Vec<(String, String)> {
+        let now = std::time::Instant::now();
+        let now_sec = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let stale_order_ids: Vec<(String, String)> = {
+            let heartbeats = self.order_heartbeats.read().await;
+            let orders = self.orders.read().await;
+            orders
+                .iter()
+                .filter(|(id, o)| {
+                    if o.is_matched {
+                        return false;
+                    }
+                    if let Some(last) = heartbeats.get(*id) {
+                        now.duration_since(*last) >= timeout
+                    } else {
+                        // Fallback: if order has no explicit heartbeat, check created_at age
+                        now_sec.saturating_sub(o.created_at) >= timeout.as_secs()
+                    }
+                })
+                .map(|(id, o)| (id.clone(), o.maker_base_address.clone()))
+                .collect()
+        };
+
+        let mut pruned = Vec::new();
+        for (order_id, maker_base) in stale_order_ids {
+            if self.remove_order(&order_id, "Maker disconnected (no communication for 60s)").await.is_some() {
+                pruned.push((order_id, maker_base));
+            }
+        }
+        pruned
     }
 
     /// Marks an order as matched/locked for an active atomic swap

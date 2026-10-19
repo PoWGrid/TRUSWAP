@@ -285,19 +285,23 @@ impl RelayClient {
                         is_conn_bg.store(true, Ordering::Relaxed);
 
                         let (mut write, mut read) = ws_stream.split();
-                        let mut ping_interval = tokio::time::interval(Duration::from_secs(12));
+                        let mut ping_interval = tokio::time::interval(Duration::from_secs(15));
                         let mut last_seen = tokio::time::Instant::now();
 
                         loop {
                             tokio::select! {
                                 _ = ping_interval.tick() => {
-                                    if last_seen.elapsed() > Duration::from_secs(25) {
-                                        warn!("[RELAY-CLIENT-BG] Connection stale (no frames for >25s). Reconnecting...");
+                                    if last_seen.elapsed() > Duration::from_secs(45) {
+                                        warn!("[RELAY-CLIENT-BG] Connection stale (no frames for >45s). Reconnecting...");
                                         break;
                                     }
                                     if let Err(e) = write.send(Message::Ping(vec![].into())).await {
                                         warn!("[RELAY-CLIENT-BG] Ping error: {}", e);
                                         break;
+                                    }
+                                    let ping_msg = ClientMessage::Ping;
+                                    if let Ok(serialized) = serde_json::to_string(&ping_msg) {
+                                        let _ = write.send(Message::Text(serialized.into())).await;
                                     }
                                 }
                                 Some(outbound_msg) = outbound_rx.recv() => {

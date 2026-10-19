@@ -145,7 +145,7 @@ impl TuiManager {
 
         out.push_str(&border_top);
         out.push_str(&box_row(
-            "\x1b[1;36m► POWGRID TRUSWAP ($TRU) CROSS-CHAIN P2P ATOMIC RUNNER v1.0.0\x1b[0m",
+            &format!("\x1b[1;36m► POWGRID TRUSWAP ($TRU) CROSS-CHAIN P2P ATOMIC RUNNER v{}\x1b[0m", env!("CARGO_PKG_VERSION")),
             inner_width,
         ));
 

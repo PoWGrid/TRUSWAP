@@ -1,5 +1,6 @@
 # Build targets & compiled binaries
-/target
+target/
+**/target/
 /truswap
 /truswap_*
 /releases
@@ -36,6 +37,8 @@ WALLETS.md
 *.crt
 *.pfx
 *.p12
+solana_*.json
+*id.json
 
 # Python cache
 __pycache__/

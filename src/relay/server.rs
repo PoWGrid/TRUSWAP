@@ -90,12 +90,15 @@ async fn ws_orderbook_handler(
         .on_upgrade(move |socket| handle_ws_session(socket, client_ip, ctx))
 }
 
+static NEXT_SESSION_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
 async fn handle_ws_session(
     socket: WebSocket,
     client_ip: std::net::IpAddr,
     ctx: RelayServerContext,
 ) {
-    debug!("[RELAY-WS] Client connected: {}", client_ip);
+    let session_id = NEXT_SESSION_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    debug!("[RELAY-WS] Client connected: {} (session #{})", client_ip, session_id);
     let (mut sender, mut receiver) = socket.split();
 
     // 1. Send initial orderbook snapshot
@@ -122,12 +125,12 @@ async fn handle_ws_session(
     // 2. Subscribe to orderbook broadcast channel
     let mut broadcast_rx = ctx.orderbook.broadcast_tx.subscribe();
 
-    // 3. Main event loop: client incoming & server broadcast
-    let mut ping_interval = tokio::time::interval(Duration::from_secs(30));
+    // 3. Main event loop: client incoming & server broadcast with 15s ping-pong interval
+    let mut ping_interval = tokio::time::interval(Duration::from_secs(15));
 
     loop {
         tokio::select! {
-            // Heartbeat ping
+            // Heartbeat ping every 15 seconds
             _ = ping_interval.tick() => {
                 if let Err(e) = sender.send(Message::Ping(vec![].into())).await {
                     debug!("[RELAY-WS] Ping failed for {}: {}", client_ip, e);
@@ -173,14 +176,22 @@ async fn handle_ws_session(
                             break;
                         }
 
+                        // Touch session heartbeat on any received text frame
+                        ctx.orderbook.touch_session(session_id).await;
+
                         match serde_json::from_str::<ClientMessage>(&text) {
                             Ok(msg) => {
                                 match msg {
                                     ClientMessage::SubmitOrder(payload) => {
+                                        let order_id = payload.order_id.clone();
+                                        let maker_base = payload.maker_base_address.clone();
                                         if let Err(err_evt) = handle_submit_order(&ctx, payload).await {
                                             if let Ok(err_json) = serde_json::to_string(&err_evt) {
                                                 let _ = sender.send(Message::Text(err_json.into())).await;
                                             }
+                                        } else {
+                                            // Associate submitted order and maker with this active session
+                                            ctx.orderbook.register_session_order(session_id, &order_id, &maker_base).await;
                                         }
                                     }
                                     ClientMessage::CancelOrder(payload) => {
@@ -199,6 +210,17 @@ async fn handle_ws_session(
                                         }
                                     }
                                     ClientMessage::Ping => {
+                                        ctx.orderbook.touch_session(session_id).await;
+                                        let pong = RelayBroadcastEvent::Pong;
+                                        if let Ok(pong_json) = serde_json::to_string(&pong) {
+                                            let _ = sender.send(Message::Text(pong_json.into())).await;
+                                        }
+                                    }
+                                    ClientMessage::Heartbeat(payload) => {
+                                        ctx.orderbook.touch_session(session_id).await;
+                                        if let Some(ref base_addr) = payload.maker_base_address {
+                                            ctx.orderbook.associate_session_maker(session_id, base_addr).await;
+                                        }
                                         let pong = RelayBroadcastEvent::Pong;
                                         if let Ok(pong_json) = serde_json::to_string(&pong) {
                                             let _ = sender.send(Message::Text(pong_json.into())).await;
@@ -218,11 +240,14 @@ async fn handle_ws_session(
                         }
                     }
                     Some(Ok(Message::Ping(payload))) => {
+                        ctx.orderbook.touch_session(session_id).await;
                         let _ = sender.send(Message::Pong(payload)).await;
                     }
-                    Some(Ok(Message::Pong(_))) => {}
+                    Some(Ok(Message::Pong(_))) => {
+                        ctx.orderbook.touch_session(session_id).await;
+                    }
                     Some(Ok(Message::Close(_))) => {
-                        debug!("[RELAY-WS] Client {} closed session", client_ip);
+                        debug!("[RELAY-WS] Client {} closed session #{}", client_ip, session_id);
                         break;
                     }
                     Some(Err(e)) => {
@@ -237,8 +262,9 @@ async fn handle_ws_session(
         }
     }
 
+    ctx.orderbook.release_session(session_id).await;
     ctx.guard.release_connection(client_ip);
-    debug!("[RELAY-WS] Session closed for {}", client_ip);
+    debug!("[RELAY-WS] Session #{} closed for {}", session_id, client_ip);
 }
 
 /// Validates and adds a new signed order to the orderbook
@@ -923,5 +949,51 @@ mod tests {
         orderbook.remove_order("order1", "Swap completed").await;
         assert_eq!(orderbook.get_taker_allocated_usdc(taker_base, 300).await, 0.0);
         assert_eq!(orderbook.get_taker_allocated_tru(taker_tru, 300).await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_maker_heartbeat_timeout_prunes_orders() {
+        let orderbook = HotOrderbookState::new();
+        let session_id = 999;
+        let maker_base = "0x1111111111111111111111111111111111111111";
+
+        let order = RelayOrder {
+            order_id: "order_hb_test".to_string(),
+            side: RelayOrderSide::SellTru,
+            amount_tru: 10.0,
+            amount_usdc: 50.0,
+            price: 5.0,
+            hash160_hex: "0102030405060708090a0b0c0d0e0f1011121314".to_string(),
+            timelock: 1728000000,
+            maker_tru_address: "TLXmMaker1".to_string(),
+            maker_tru_pubkey: None,
+            maker_base_address: maker_base.to_string(),
+            created_at: 1728000001,
+            is_matched: false,
+        };
+        orderbook.add_order(order).await;
+        orderbook.register_session_order(session_id, "order_hb_test", maker_base).await;
+
+        // 1. Immediately, order is alive and fresh
+        assert!(orderbook.orders.read().await.contains_key("order_hb_test"));
+        let pruned_early = orderbook.prune_stale_orders(Duration::from_secs(60)).await;
+        assert!(pruned_early.is_empty(), "Order should not be pruned when fresh");
+
+        // 2. Touch session simulates ping every 15s - heartbeat remains fresh
+        orderbook.touch_session(session_id).await;
+        let pruned_touched = orderbook.prune_stale_orders(Duration::from_secs(60)).await;
+        assert!(pruned_touched.is_empty(), "Order should not be pruned after heartbeat touch");
+
+        // 3. Simulate maker disconnection: set heartbeat to 65 seconds ago
+        {
+            let mut heartbeats = orderbook.order_heartbeats.write().await;
+            heartbeats.insert("order_hb_test".to_string(), std::time::Instant::now() - Duration::from_secs(65));
+        }
+
+        // 4. Prune checks 60s timeout: order must be pruned and removed from orderbook
+        let pruned = orderbook.prune_stale_orders(Duration::from_secs(60)).await;
+        assert_eq!(pruned.len(), 1);
+        assert_eq!(pruned[0].0, "order_hb_test");
+        assert!(!orderbook.orders.read().await.contains_key("order_hb_test"), "Order must be removed after 60s heartbeat loss");
     }
 }
