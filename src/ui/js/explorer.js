@@ -1124,8 +1124,12 @@ function renderTransactionsFeed(mempoolTxs, minedTxs) {
   }
 
   // 2. Mined user transactions from dedicated endpoint (or fallback to recent blocks)
-  if (Array.isArray(minedTxs) && minedTxs.length > 0) {
-    for (const t of minedTxs) {
+  const effectiveMinedTxs = (typeof minedTxs !== 'undefined' && Array.isArray(minedTxs))
+    ? minedTxs
+    : (typeof minedTxsCache !== 'undefined' && Array.isArray(minedTxsCache) ? minedTxsCache : null);
+
+  if (Array.isArray(effectiveMinedTxs) && effectiveMinedTxs.length > 0) {
+    for (const t of effectiveMinedTxs) {
       allTxs.push({
         txid: t.txid,
         isMempool: false,

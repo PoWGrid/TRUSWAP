@@ -85,7 +85,7 @@ async fn serve_relay_css(content: &'static str) -> impl IntoResponse {
     (
         [
             (axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8"),
-            (axum::http::header::CACHE_CONTROL, "public, max-age=86400"),
+            (axum::http::header::CACHE_CONTROL, "no-cache, no-store, must-revalidate, max-age=0"),
         ],
         content,
     )
@@ -95,7 +95,7 @@ async fn serve_relay_js(content: &'static str) -> impl IntoResponse {
     (
         [
             (axum::http::header::CONTENT_TYPE, "application/javascript; charset=utf-8"),
-            (axum::http::header::CACHE_CONTROL, "public, max-age=86400"),
+            (axum::http::header::CACHE_CONTROL, "no-cache, no-store, must-revalidate, max-age=0"),
         ],
         content,
     )
