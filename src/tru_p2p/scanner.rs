@@ -166,6 +166,22 @@ pub struct CachedBlockTxSummary {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ExplorerFeedTx {
+    pub txid: String,
+    pub height: u32,
+    pub timestamp: u64,
+    pub amount_tru: f64,
+    #[serde(default)]
+    pub fee_tru: f64,
+    #[serde(default)]
+    pub is_evolve: bool,
+    #[serde(default)]
+    pub is_htlc: bool,
+    #[serde(default)]
+    pub is_quantum: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CachedTruBlock {
     pub height: u32,
     pub hash: String,
@@ -1947,6 +1963,60 @@ impl BlockScanner {
         } else {
             b_lock.values().rev().take(limit).cloned().collect()
         }
+    }
+
+    pub async fn get_recent_transactions(&self, limit: usize) -> Vec<ExplorerFeedTx> {
+        let max_txs = if limit == 0 { 30 } else { limit };
+        let mut results = Vec::with_capacity(max_txs);
+        let b_lock = self.block_cache.read().await;
+
+        for block in b_lock.values().rev() {
+            if !block.tx_summaries.is_empty() {
+                for s in block.tx_summaries.iter().rev() {
+                    if s.is_coinbase {
+                        continue;
+                    }
+                    results.push(ExplorerFeedTx {
+                        txid: s.txid.clone(),
+                        height: block.height,
+                        timestamp: block.timestamp,
+                        amount_tru: s.amount_tru,
+                        fee_tru: if s.fee_tru > 0.0 { s.fee_tru } else { 0.0001 },
+                        is_evolve: s.is_evolve,
+                        is_htlc: s.is_htlc,
+                        is_quantum: s.is_quantum,
+                    });
+                    if results.len() >= max_txs {
+                        return results;
+                    }
+                }
+            } else if block.txids.len() > 1 {
+                let user_txids = &block.txids[1..];
+                let user_amount = (block.total_amount_tru - 50.0).max(0.0);
+                let amount_per_tx = if !user_txids.is_empty() {
+                    user_amount / user_txids.len() as f64
+                } else {
+                    0.0
+                };
+                for txid in user_txids.iter().rev() {
+                    results.push(ExplorerFeedTx {
+                        txid: txid.clone(),
+                        height: block.height,
+                        timestamp: block.timestamp,
+                        amount_tru: amount_per_tx,
+                        fee_tru: 0.0001,
+                        is_evolve: false,
+                        is_htlc: false,
+                        is_quantum: false,
+                    });
+                    if results.len() >= max_txs {
+                        return results;
+                    }
+                }
+            }
+        }
+
+        results
     }
 
     pub async fn get_block_by_query(&self, query: &str) -> Option<CachedTruBlock> {

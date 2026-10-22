@@ -66,6 +66,7 @@ pub fn create_relay_router(ctx: RelayServerContext) -> Router {
         .route("/explorer/api/search", get(explorer_search_handler))
         .route("/explorer/api/explorer/search", get(explorer_search_handler))
         .route("/explorer/api/blocks", get(explorer_blocks_handler))
+        .route("/explorer/api/transactions", get(explorer_transactions_handler))
         .route("/explorer/api/block/:query", get(explorer_block_details_handler))
         .route("/explorer/api/tx/:txid", get(explorer_tx_details_handler))
         .route("/explorer/api/mempool", get(explorer_mempool_handler))
@@ -73,6 +74,7 @@ pub fn create_relay_router(ctx: RelayServerContext) -> Router {
         .route("/api/explorer/stats", get(explorer_stats_handler))
         .route("/api/explorer/search", get(explorer_search_handler))
         .route("/api/blocks", get(explorer_blocks_handler))
+        .route("/api/transactions", get(explorer_transactions_handler))
         .route("/api/block/:query", get(explorer_block_details_handler))
         .route("/api/tx/:txid", get(explorer_tx_details_handler))
         .route("/api/mempool", get(explorer_mempool_handler))
@@ -149,6 +151,15 @@ async fn explorer_blocks_handler(
     let limit = query.limit.unwrap_or(30);
     let blocks = ctx.block_scanner.get_recent_blocks(limit).await;
     (StatusCode::OK, axum::Json(blocks)).into_response()
+}
+
+async fn explorer_transactions_handler(
+    State(ctx): State<RelayServerContext>,
+    axum::extract::Query(query): axum::extract::Query<BlocksQuery>,
+) -> Response {
+    let limit = query.limit.unwrap_or(30);
+    let txs = ctx.block_scanner.get_recent_transactions(limit).await;
+    (StatusCode::OK, axum::Json(txs)).into_response()
 }
 
 async fn explorer_block_details_handler(

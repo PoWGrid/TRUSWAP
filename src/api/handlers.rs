@@ -2179,6 +2179,14 @@ pub async fn get_blocks(
     Json(state.block_scanner.get_recent_blocks(limit).await)
 }
 
+pub async fn get_transactions(
+    State(state): State<AppState>,
+    Query(query): Query<BlocksQuery>,
+) -> Json<Vec<crate::tru_p2p::scanner::ExplorerFeedTx>> {
+    let limit = query.limit.unwrap_or(30);
+    Json(state.block_scanner.get_recent_transactions(limit).await)
+}
+
 pub async fn get_block_details(
     State(state): State<AppState>,
     Path(query): Path<String>,

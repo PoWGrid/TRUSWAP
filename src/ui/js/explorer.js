@@ -5,6 +5,7 @@ let lastSeenBlockHash = '';
 let lastBlockTimestamp = 0;
 let recentBlocksCache = [];
 let mempoolTxsCache = [];
+let minedTxsCache = [];
 
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
@@ -1048,9 +1049,6 @@ window.loadMoreBlocks = loadMoreBlocks;
 
 function loadMoreTransactions() {
   currentTxsLimit += 30;
-  if (currentBlocksLimit < currentTxsLimit) {
-    currentBlocksLimit = currentTxsLimit;
-  }
   pollExplorerTelemetry();
 }
 window.loadMoreTransactions = loadMoreTransactions;
@@ -1101,7 +1099,7 @@ function renderBlocksFeed(blocks) {
   container.innerHTML = itemsHtml + loadMoreBtn;
 }
 
-function renderTransactionsFeed(mempoolTxs, recentBlocks) {
+function renderTransactionsFeed(mempoolTxs, minedTxs) {
   const container = document.getElementById('feed-txs-list');
   if (!container) return;
 
@@ -1125,9 +1123,25 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
     }
   }
 
-  // 2. Mined user transactions from recent blocks (exclude technical coinbase mints)
-  if (Array.isArray(recentBlocks)) {
-    for (const b of recentBlocks) {
+  // 2. Mined user transactions from dedicated endpoint (or fallback to recent blocks)
+  if (Array.isArray(minedTxs) && minedTxs.length > 0) {
+    for (const t of minedTxs) {
+      allTxs.push({
+        txid: t.txid,
+        isMempool: false,
+        height: t.height,
+        timestamp: t.timestamp,
+        amountTru: t.is_evolve ? 0.0 : (t.amount_tru !== undefined ? t.amount_tru : (t.amountTru || 0)),
+        feeTru: t.fee_tru !== undefined ? t.fee_tru : (t.feeTru || 0.0001),
+        isEvolve: !!(t.is_evolve || t.isEvolve),
+        isHtlc: !!(t.is_htlc || t.isHtlc),
+        isVault: false,
+      });
+      if (allTxs.length >= currentTxsLimit) break;
+    }
+  } else if (Array.isArray(recentBlocksCache)) {
+    // Fallback if dedicated transactions endpoint is unavailable
+    for (const b of recentBlocksCache) {
       if (Array.isArray(b.tx_summaries) && b.tx_summaries.length > 0) {
         for (const s of b.tx_summaries) {
           if (s.is_coinbase) continue; // exclude coinbase mint
@@ -1142,7 +1156,7 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
             isHtlc: s.is_htlc,
             isVault: false,
           });
-          if (allTxs.length >= currentTxsLimit + 50) break;
+          if (allTxs.length >= currentTxsLimit) break;
         }
       } else if (Array.isArray(b.txids) && b.txids.length > 1) {
         // Fallback for older blocks
@@ -1161,10 +1175,10 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
             isHtlc: false,
             isVault: false,
           });
-          if (allTxs.length >= currentTxsLimit + 50) break;
+          if (allTxs.length >= currentTxsLimit) break;
         }
       }
-      if (allTxs.length >= currentTxsLimit + 50) break;
+      if (allTxs.length >= currentTxsLimit) break;
     }
   }
 
@@ -1227,11 +1241,11 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
 
 async function pollExplorerTelemetry() {
   try {
-    const fetchLimit = Math.max(currentBlocksLimit, currentTxsLimit);
-    const [statsRes, blocksRes, mempoolRes] = await Promise.all([
+    const [statsRes, blocksRes, mempoolRes, txsRes] = await Promise.all([
       fetch(EXPLORER_BASE + '/api/explorer/stats').then(r => r.ok ? r.json() : null),
-      fetch(`${EXPLORER_BASE}/api/blocks?limit=${fetchLimit}`).then(r => r.ok ? r.json() : null),
+      fetch(`${EXPLORER_BASE}/api/blocks?limit=${currentBlocksLimit}`).then(r => r.ok ? r.json() : null),
       fetch(EXPLORER_BASE + '/api/mempool').then(r => r.ok ? r.json() : null),
+      fetch(`${EXPLORER_BASE}/api/transactions?limit=${currentTxsLimit}`).then(r => r.ok ? r.json() : null),
     ]);
 
     if (statsRes) {
@@ -1269,7 +1283,10 @@ async function pollExplorerTelemetry() {
       ? mempoolRes.transactions
       : (Array.isArray(mempoolRes) ? mempoolRes : []);
     mempoolTxsCache = mempoolList;
-    renderTransactionsFeed(mempoolTxsCache, recentBlocksCache);
+    if (txsRes && Array.isArray(txsRes)) {
+      minedTxsCache = txsRes;
+    }
+    renderTransactionsFeed(mempoolTxsCache, minedTxsCache);
   } catch (err) {
     console.warn('[EXPLORER] Telemetry poll failed:', err);
   }
