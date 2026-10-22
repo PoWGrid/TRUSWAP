@@ -2149,6 +2149,7 @@ pub async fn get_tx_details(
                 "version": details.version,
                 "lock_time": details.lock_time,
                 "is_coinbase": details.is_coinbase,
+                "is_quantum": details.is_quantum,
                 "inputs": details.inputs,
                 "outputs": details.outputs,
             })),

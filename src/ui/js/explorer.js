@@ -148,11 +148,16 @@ function renderTxDetailContent(data) {
 
   const inputs = Array.isArray(data.inputs) ? data.inputs : [];
   const outputs = Array.isArray(data.outputs) ? data.outputs : [];
+  const isQuantumTx = !!data.is_quantum
+    || outputs.some(o => o.is_quantum || (o.address && o.address.startsWith('truq1:')) || (o.script_pubkey && (o.script_pubkey.includes('bb51') || o.script_pubkey.includes('bb'))))
+    || inputs.some(i => i.is_quantum || (i.script_sig && i.script_sig.length >= 2000));
 
   const inputsHtml = inputs.length > 0 ? inputs.map((inp, idx) => {
     const isCb = inp.is_coinbase || (inp.prev_txid && (inp.prev_txid.toLowerCase().includes('genesis') || inp.prev_txid.split('').every(c => c === '0')));
     const prevTx = inp.prev_txid || '0000000000000000000000000000000000000000000000000000000000000000';
     const shortPrev = prevTx.length > 18 ? `${prevTx.slice(0, 8)}...${prevTx.slice(-6)}` : prevTx;
+    const isWotsSig = inp.is_quantum || (inp.script_sig && inp.script_sig.length >= 2000);
+    const sigLenBytes = inp.script_sig ? Math.round(inp.script_sig.length / 2) : 0;
     return `
       <div class="tru-tx-io-item">
         <div class="tru-tx-target-group">
@@ -160,6 +165,7 @@ function renderTxDetailContent(data) {
             <span class="tru-tx-target-link" onclick="inspectTx('${escapeHtml(prevTx)}')" title="View Prevout: ${escapeHtml(prevTx)}">${escapeHtml(shortPrev)}</span>
             <button type="button" class="mecha-mini-btn" style="height: 18px; padding: 0 4px; font-size: 0.65rem;" onclick="copyToClipboard('${escapeHtml(prevTx)}', event)" title="Copy Prevout TXID">📋</button>
           `}
+          ${isWotsSig ? `<span class="mini-tag-quantum" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 4px; padding: 1px 6px; font-size: 0.65rem; font-weight: 700;">⚡ WOTS+ Signature (${sigLenBytes} B)</span>` : ''}
         </div>
         <div class="tru-tx-io-sub">
           ${isCb ? 'Mint' : `Output #${inp.prev_vout !== undefined ? inp.prev_vout : idx}`}
@@ -169,12 +175,22 @@ function renderTxDetailContent(data) {
   }).join('') : `<div class="tru-tx-io-item" style="justify-content: center; color: #64748b;">No inputs recorded</div>`;
 
   const outputsHtml = outputs.length > 0 ? outputs.map(out => {
+    const isQuantum = out.is_quantum || (out.address && out.address.startsWith('truq1:')) || (out.script_pubkey && out.script_pubkey.includes('bb51'));
     const target = out.display_target || out.address || `${data.txid}:${out.vout}`;
-    const shortTarget = out.address
-      ? (out.address.length > 20 ? `${out.address.slice(0, 8)}...${out.address.slice(-6)}` : out.address)
-      : (target.length > 20 ? `${target.slice(0, 8)}...${target.slice(-6)}` : target);
+    let shortTarget = target;
+    if (out.address && out.address.startsWith('truq1:')) {
+      const parts = out.address.split(':');
+      const scriptPart = parts[1] || '';
+      const checksumPart = parts[2] || '';
+      shortTarget = `truq1:${scriptPart.slice(0, 8)}...${scriptPart.slice(-8)}${checksumPart ? ':' + checksumPart.slice(0, 6) : ''}`;
+    } else if (out.address) {
+      shortTarget = out.address.length > 20 ? `${out.address.slice(0, 8)}...${out.address.slice(-6)}` : out.address;
+    } else if (target.length > 20) {
+      shortTarget = `${target.slice(0, 8)}...${target.slice(-6)}`;
+    }
     const amt = typeof out.amount_tru === 'number' ? out.amount_tru : parseFloat(out.amount_tru || 0);
     const amtStr = amt.toFixed(amt > 0 && amt < 0.0001 ? 8 : (amt % 1 === 0 ? 0 : 7));
+    const hasWotsVerify = out.script_pubkey && (out.script_pubkey.includes('bb51') || out.script_pubkey.includes('bb'));
 
     return `
       <div class="tru-tx-io-item">
@@ -186,6 +202,8 @@ function renderTxDetailContent(data) {
             <span class="tru-tx-target-text" title="${escapeHtml(target)}">${escapeHtml(shortTarget)}</span>
             <button type="button" class="mecha-mini-btn" style="height: 18px; padding: 0 4px; font-size: 0.65rem;" onclick="copyToClipboard('${escapeHtml(target)}', event)" title="Copy Target">📋</button>
           `}
+          ${isQuantum ? '<span class="mini-tag-quantum" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 4px; padding: 1px 6px; font-size: 0.65rem; font-weight: 700;">⚡ Quantum WOTS+</span>' : ''}
+          ${hasWotsVerify ? '<span class="mini-tag-quantum" style="background: rgba(168, 85, 247, 0.12); color: #e879f9; border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 4px; padding: 1px 5px; font-size: 0.65rem;" title="Opcode 0xbb: OP_CHECKWOTSVERIFY">OP_CHECKWOTSVERIFY</span>' : ''}
           ${out.is_htlc ? '<span class="mini-tag-htlc">HTLC Script</span>' : ''}
           ${out.is_vault ? '<span class="mini-tag-vault">Local Vault</span>' : ''}
         </div>
@@ -202,6 +220,11 @@ function renderTxDetailContent(data) {
         ← Back to Live Feeds
       </button>
       <div style="display: flex; gap: 8px;">
+        ${isQuantumTx ? `
+          <span class="badge-confs" style="background: rgba(168, 85, 247, 0.18); color: #c084fc; border-color: rgba(168, 85, 247, 0.45); font-weight: 700;">
+            ⚡ QUANTUM WOTS+ SECURED
+          </span>
+        ` : ''}
         <span class="badge-confs" style="${isConfirmed ? '' : 'background: rgba(255, 184, 0, 0.12); color: var(--tru-gold); border-color: rgba(255, 184, 0, 0.3);'}">
           ${isConfirmed ? '● CONFIRMED' : '⏳ MEMPOOL'}
         </span>
@@ -285,6 +308,21 @@ function renderTxDetailContent(data) {
           <span class="tru-tx-meta-label">Timestamp:</span>
           <span class="tru-tx-meta-val">${data.formatted_time || 'Recent'}${data.timestamp ? ` <span style="white-space: nowrap; color: #94a3b8; font-size: 0.74rem;">(<span class="live-time-ago" data-timestamp="${data.timestamp}">${timeAgo(data.timestamp)}</span>)</span>` : ''}</span>
         </div>
+        ${isQuantumTx ? `
+        <div class="tru-tx-meta-row full-width" style="background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; padding: 12px 14px; margin-top: 6px;">
+          <div style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="color: #c084fc; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; gap: 6px;">
+                ⚛️ Post-Quantum Protection Active (RFC 8391 Winternitz OTS)
+              </span>
+              <span style="font-size: 0.7rem; color: #a855f7; background: rgba(168, 85, 247, 0.2); padding: 2px 7px; border-radius: 4px; font-family: monospace;">OP_CHECKWOTSVERIFY (0xbb)</span>
+            </div>
+            <div style="font-size: 0.76rem; color: #cbd5e1; line-height: 1.45;">
+              This transaction is protected by post-quantum Winternitz One-Time Signatures (WOTS+) executed directly on the TRU virtual machine via opcode <code>0xbb</code>. Keys and descriptors use the <code>truq1:</code> canonical format, resilient against Shor's algorithm on quantum computers.
+            </div>
+          </div>
+        </div>
+        ` : ''}
       </div>
     </div>
   `;

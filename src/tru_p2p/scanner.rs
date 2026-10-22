@@ -99,6 +99,8 @@ pub struct MempoolOutput {
     pub address: Option<String>,
     pub is_vault: bool,
     pub is_htlc: bool,
+    #[serde(default)]
+    pub is_quantum: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -107,6 +109,8 @@ pub struct CachedTruTx {
     pub version: i32,
     pub lock_time: u32,
     pub is_coinbase: bool,
+    #[serde(default)]
+    pub is_quantum: bool,
     pub block_height: Option<u32>,
     pub block_hash: Option<String>,
     pub confirmations: u32,
@@ -121,6 +125,8 @@ pub struct CachedTruTxIn {
     pub prev_vout: u32,
     pub script_sig: String,
     pub is_coinbase: bool,
+    #[serde(default)]
+    pub is_quantum: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -133,6 +139,8 @@ pub struct CachedTruTxOut {
     pub display_target: String,
     pub is_htlc: bool,
     pub is_vault: bool,
+    #[serde(default)]
+    pub is_quantum: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -1513,35 +1521,25 @@ impl BlockScanner {
                 // Populate internal transaction details cache
                 let cached_inputs: Vec<CachedTruTxIn> = parsed.inputs.iter().map(|in_tx| {
                     let is_cb = parsed.is_coinbase || in_tx.prev_txid.chars().all(|c| c == '0');
+                    let is_quantum = in_tx.script_sig.len() >= 2000;
                     CachedTruTxIn {
                         prev_txid: in_tx.prev_txid.clone(),
                         prev_vout: in_tx.prev_vout,
                         script_sig: in_tx.script_sig.clone(),
                         is_coinbase: is_cb,
+                        is_quantum,
                     }
                 }).collect();
 
+                let mut tx_has_quantum_out = false;
                 let cached_outputs: Vec<CachedTruTxOut> = parsed.outputs.iter().map(|out| {
                     let is_htlc = inspect_htlc_script(&out.script_pubkey).is_some();
                     let is_vault = target_spk.as_ref().map(|s| s == &out.script_pubkey).unwrap_or(false);
-                    let address = if out.script_pubkey.starts_with("76a914")
-                        && out.script_pubkey.ends_with("88ac")
-                        && out.script_pubkey.len() == 50
-                    {
-                        if let Ok(pkh_bytes) = hex::decode(&out.script_pubkey[6..46]) {
-                            if pkh_bytes.len() == 20 {
-                                let mut arr = [0u8; 20];
-                                arr.copy_from_slice(&pkh_bytes);
-                                Some(crate::core::keys::pkh_to_tru_address(&arr))
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
+                    let address = crate::relay::utxo_guard::script_pubkey_to_tru_address(&out.script_pubkey);
+                    let is_quantum = address.as_ref().map(|a| a.starts_with("truq1:")).unwrap_or(false);
+                    if is_quantum {
+                        tx_has_quantum_out = true;
+                    }
                     let display_target = address.clone().unwrap_or_else(|| format!("{}:{}", parsed.txid, out.vout));
                     CachedTruTxOut {
                         vout: out.vout,
@@ -1552,14 +1550,18 @@ impl BlockScanner {
                         display_target,
                         is_htlc,
                         is_vault,
+                        is_quantum,
                     }
                 }).collect();
+
+                let is_quantum_tx = tx_has_quantum_out || cached_inputs.iter().any(|i| i.is_quantum);
 
                 let cached_tx = CachedTruTx {
                     txid: parsed.txid.clone(),
                     version: block_version,
                     lock_time: 0,
                     is_coinbase: parsed.is_coinbase,
+                    is_quantum: is_quantum_tx,
                     block_height: Some(block_height),
                     block_hash: Some(block_hash.clone()),
                     confirmations: 1,
@@ -2005,8 +2007,8 @@ impl BlockScanner {
             });
         }
 
-        // 4. Search by TRU address (starts with 'T')
-        if q.starts_with('T') {
+        // 4. Search by TRU address (starts with 'T' or 'truq1:')
+        if q.starts_with('T') || q.starts_with("truq1:") {
             let balance_atoms = self.address_balances.read().await.get(q).copied().unwrap_or(0);
             let total_received_atoms = self.address_total_received.read().await.get(q).copied().unwrap_or(0);
             let total_sent_atoms = self.address_total_sent.read().await.get(q).copied().unwrap_or(0);
@@ -2033,7 +2035,7 @@ impl BlockScanner {
                 }
             }
 
-            if total_received_atoms > 0 || !matched_txs.is_empty() || (q.len() >= 26 && q.len() <= 35) {
+            if total_received_atoms > 0 || !matched_txs.is_empty() || (q.len() >= 26 && q.len() <= 35) || q.starts_with("truq1:") {
                 return serde_json::json!({
                     "found": true,
                     "target_type": "address",
@@ -2106,24 +2108,8 @@ impl BlockScanner {
                     );
                 }
 
-                let address = if out.script_pubkey.starts_with("76a914")
-                    && out.script_pubkey.ends_with("88ac")
-                    && out.script_pubkey.len() == 50
-                {
-                    if let Ok(pkh_bytes) = hex::decode(&out.script_pubkey[6..46]) {
-                        if pkh_bytes.len() == 20 {
-                            let mut arr = [0u8; 20];
-                            arr.copy_from_slice(&pkh_bytes);
-                            Some(crate::crypto::pkh_to_tru_address(&arr))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
+                let address = crate::relay::utxo_guard::script_pubkey_to_tru_address(&out.script_pubkey);
+                let is_quantum = address.as_ref().map(|a| a.starts_with("truq1:")).unwrap_or(false);
 
                 mempool_outputs.push(MempoolOutput {
                     vout: out.vout,
@@ -2133,6 +2119,7 @@ impl BlockScanner {
                     address,
                     is_vault: out_is_vault,
                     is_htlc: out_is_htlc,
+                    is_quantum,
                 });
             }
 
@@ -2285,15 +2272,21 @@ impl BlockScanner {
 
             // Populate tx_cache with mempool entry
             let mempool_inputs: Vec<CachedTruTxIn> = parsed.inputs.iter().map(|in_tx| {
+                let is_quantum = in_tx.script_sig.len() >= 2000;
                 CachedTruTxIn {
                     prev_txid: in_tx.prev_txid.clone(),
                     prev_vout: in_tx.prev_vout,
                     script_sig: in_tx.script_sig.clone(),
                     is_coinbase: parsed.is_coinbase || in_tx.prev_txid.chars().all(|c| c == '0'),
+                    is_quantum,
                 }
             }).collect();
+            let mut mem_has_quantum_out = false;
             let mempool_cached_outputs: Vec<CachedTruTxOut> = entry.outputs.iter().map(|out| {
                 let display_target = out.address.clone().unwrap_or_else(|| format!("{}:{}", txid, out.vout));
+                if out.is_quantum {
+                    mem_has_quantum_out = true;
+                }
                 CachedTruTxOut {
                     vout: out.vout,
                     amount_atoms: out.amount_atoms,
@@ -2303,13 +2296,16 @@ impl BlockScanner {
                     display_target,
                     is_htlc: out.is_htlc,
                     is_vault: out.is_vault,
+                    is_quantum: out.is_quantum,
                 }
             }).collect();
+            let is_mem_quantum = mem_has_quantum_out || mempool_inputs.iter().any(|i| i.is_quantum);
             let cached_mem_tx = CachedTruTx {
                 txid: txid.clone(),
                 version: 1,
                 lock_time: htlc_timelock.unwrap_or(0),
                 is_coinbase: parsed.is_coinbase,
+                is_quantum: is_mem_quantum,
                 block_height: None,
                 block_hash: None,
                 confirmations: 0,
@@ -2372,8 +2368,10 @@ impl BlockScanner {
                         prev_vout,
                         script_sig: String::new(),
                         is_coinbase: false,
+                        is_quantum: false,
                     }
                 }).collect();
+                let is_quantum_tx = entry.outputs.iter().any(|o| o.is_quantum);
                 let outputs = entry.outputs.iter().map(|o| {
                     let display_target = o.address.clone().unwrap_or_else(|| format!("{}:{}", entry.txid, o.vout));
                     CachedTruTxOut {
@@ -2385,6 +2383,7 @@ impl BlockScanner {
                         display_target,
                         is_htlc: o.is_htlc,
                         is_vault: o.is_vault,
+                        is_quantum: o.is_quantum,
                     }
                 }).collect();
                 return Some(CachedTruTx {
@@ -2392,6 +2391,7 @@ impl BlockScanner {
                     version: 1,
                     lock_time: entry.htlc_timelock.unwrap_or(0),
                     is_coinbase: false,
+                    is_quantum: is_quantum_tx,
                     block_height: None,
                     block_hash: None,
                     confirmations: 0,
@@ -2428,6 +2428,7 @@ impl BlockScanner {
                         display_target: format!("{}:{}", s.txid, s.vout),
                         is_htlc: true,
                         is_vault: false,
+                        is_quantum: false,
                     }
                 }).collect();
                 return Some(CachedTruTx {
@@ -2435,6 +2436,7 @@ impl BlockScanner {
                     version: 1,
                     lock_time: first.timelock,
                     is_coinbase: false,
+                    is_quantum: false,
                     block_height: Some(block_h),
                     block_hash,
                     confirmations: confs,
@@ -2471,6 +2473,7 @@ impl BlockScanner {
                         display_target: format!("{}:{}", u.txid, u.vout),
                         is_htlc: false,
                         is_vault: true,
+                        is_quantum: false,
                     }
                 }).collect();
                 return Some(CachedTruTx {
@@ -2478,6 +2481,7 @@ impl BlockScanner {
                     version: 1,
                     lock_time: 0,
                     is_coinbase: false,
+                    is_quantum: false,
                     block_height: Some(block_h),
                     block_hash,
                     confirmations: confs,

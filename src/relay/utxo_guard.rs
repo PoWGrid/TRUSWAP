@@ -16,7 +16,24 @@ use crate::tru_p2p::wire::BlockProto;
 pub const HTLC_TOTAL_FEE_BUFFER_ATOMS: u64 = 500;
 pub const HTLC_CLAIM_FEE_ATOMS: u64 = HTLC_TOTAL_FEE_BUFFER_ATOMS;
 
-/// Derives a TRU address from a P2PKH scriptPubKey hex string
+use sha2::{Digest, Sha256};
+
+/// Returns true if script bytes follow canonical WOTS+ (PQ01) format:
+/// <01> <seed32> <root32> CHECKWOTSVERIFY [<compressedECDSA33> CHECKSIGVERIFY] OP_1
+pub fn is_canonical_wots_script(s: &[u8]) -> bool {
+    if s.len() != 69 && s.len() != 104 {
+        return false;
+    }
+    if s[0] != 0x51 || s[1] != 32 || s[34] != 32 || s[67] != 0xbb || *s.last().unwrap() != 0x51 {
+        return false;
+    }
+    if s.len() == 104 && (s[68] != 33 || (s[69] != 2 && s[69] != 3) || s[102] != 0xad) {
+        return false;
+    }
+    true
+}
+
+/// Derives a TRU address from a P2PKH scriptPubKey hex string or PQ01 quantum scriptPubKey
 pub fn script_pubkey_to_tru_address(spk_hex: &str) -> Option<String> {
     let clean = spk_hex.trim().to_lowercase();
     if clean.starts_with("76a914") && clean.ends_with("88ac") && clean.len() == 50 {
@@ -26,6 +43,17 @@ pub fn script_pubkey_to_tru_address(spk_hex: &str) -> Option<String> {
                 let mut pkh = [0u8; 20];
                 pkh.copy_from_slice(&pkh_bytes);
                 return Some(crate::core::keys::pkh_to_tru_address(&pkh));
+            }
+        }
+    } else if (clean.len() == 138 || clean.len() == 208)
+        && clean.starts_with("5120")
+        && clean.ends_with("bb51")
+    {
+        if let Ok(bytes) = hex::decode(&clean) {
+            if is_canonical_wots_script(&bytes) {
+                let hash = Sha256::digest(&bytes);
+                let checksum = hex::encode(&hash[..8]);
+                return Some(format!("truq1:{}:{}", clean, checksum));
             }
         }
     }
@@ -260,5 +288,16 @@ mod tests {
         let spk = crate::core::script::tru_address_to_spk(&kp.address).unwrap();
         let derived_addr = script_pubkey_to_tru_address(&spk).unwrap();
         assert_eq!(derived_addr, kp.address);
+    }
+
+    #[test]
+    fn test_quantum_wots_descriptor_derivation() {
+        // Real transaction 14ec11a1... vout 0 from Block 52,696
+        let quantum_spk = "512078bdf82aa24d22d83b8d1503ff1784ea4c39c96b4e10b0e7e7c8387912625a94200680696ffe2b4f598b7cd37b1f4c82e36c8e903a6b99650f68ded0b25e29b758bb51";
+        let derived = script_pubkey_to_tru_address(quantum_spk).expect("should decode PQ01");
+        assert_eq!(
+            derived,
+            "truq1:512078bdf82aa24d22d83b8d1503ff1784ea4c39c96b4e10b0e7e7c8387912625a94200680696ffe2b4f598b7cd37b1f4c82e36c8e903a6b99650f68ded0b25e29b758bb51:0593e83b603fee39"
+        );
     }
 }

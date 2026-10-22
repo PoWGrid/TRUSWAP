@@ -1525,6 +1525,20 @@ body.modal-open .status-dot.active {
   white-space: nowrap;
 }
 
+.mini-tag-quantum {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.18);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  flex-shrink: 0;
+  white-space: nowrap;
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.15);
+}
+
 /* Metadata Box */
 .tru-tx-meta-box {
   background: #0f131a;
