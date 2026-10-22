@@ -984,17 +984,21 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
     }
   }
 
-  // 2. Mined transactions from recent blocks
+  // 2. Mined user transactions from recent blocks (exclude technical coinbase mints)
   if (Array.isArray(recentBlocks)) {
     for (const b of recentBlocks) {
-      if (Array.isArray(b.txids)) {
-        for (const txid of b.txids) {
+      if (Array.isArray(b.txids) && b.txids.length > 1) {
+        // txids[0] is always the coinbase mint. User transfers/consolidations start at index 1.
+        const userTxs = b.txids.slice(1);
+        const userAmount = Math.max(0, (b.total_amount_tru || 0) - 50.0);
+        const amountPerTx = userTxs.length > 0 ? (userAmount / userTxs.length) : userAmount;
+        for (const txid of userTxs) {
           allTxs.push({
             txid: txid,
             isMempool: false,
             height: b.height,
             timestamp: b.timestamp,
-            amountTru: b.total_amount_tru || 0,
+            amountTru: amountPerTx,
             isHtlc: false,
             isVault: false,
           });
@@ -1008,7 +1012,7 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
   const displayedTxs = allTxs.slice(0, currentTxsLimit);
 
   if (displayedTxs.length === 0) {
-    container.innerHTML = `<div style="text-align: center; color: var(--text-dim); padding: 30px;">Mempool is empty</div>`;
+    container.innerHTML = `<div style="text-align: center; color: var(--text-dim); padding: 30px;">No recent user transactions</div>`;
     return;
   }
 
