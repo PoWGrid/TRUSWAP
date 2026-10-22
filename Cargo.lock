@@ -2187,7 +2187,7 @@ dependencies = [
 
 [[package]]
 name = "truswap"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "axum",
  "base64 0.22.1",
