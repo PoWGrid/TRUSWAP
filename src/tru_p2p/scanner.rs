@@ -85,6 +85,8 @@ pub struct MempoolEntry {
     pub is_htlc: bool,
     #[serde(default)]
     pub is_evolve: bool,
+    #[serde(default)]
+    pub fee_tru: f64,
     pub htlc_hash160: Option<String>,
     pub htlc_timelock: Option<u32>,
     pub outputs: Vec<MempoolOutput>,
@@ -151,6 +153,8 @@ pub struct CachedTruTxOut {
 pub struct CachedBlockTxSummary {
     pub txid: String,
     pub amount_tru: f64,
+    #[serde(default)]
+    pub fee_tru: f64,
     #[serde(default)]
     pub is_evolve: bool,
     #[serde(default)]
@@ -1599,6 +1603,7 @@ impl BlockScanner {
                 block_tx_summaries.push(CachedBlockTxSummary {
                     txid: parsed.txid.clone(),
                     amount_tru: tx_vol_atoms as f64 / 100_000_000.0,
+                    fee_tru: 0.0001,
                     is_evolve: is_ev,
                     is_coinbase: is_cb,
                     is_quantum: is_quantum_tx,
@@ -2303,6 +2308,7 @@ impl BlockScanner {
                 is_vault_related,
                 is_htlc,
                 is_evolve,
+                fee_tru: 0.0001,
                 htlc_hash160,
                 htlc_timelock,
                 outputs: mempool_outputs,

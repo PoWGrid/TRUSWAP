@@ -902,8 +902,10 @@ function renderMempoolDetailContent(data) {
     const isHtlc = !!tx.is_htlc;
     const isVault = !!tx.is_vault_related;
 
+    const feeStr = (tx.fee_tru !== undefined && tx.fee_tru > 0 ? tx.fee_tru : 0.0001).toFixed(4);
+
     return `
-      <div class="feed-tx-item" onclick="inspectTx('${escapeHtml(txid)}')" style="cursor: pointer; padding: 12px 14px;">
+      <div class="feed-tx-item" onclick="inspectTx('${escapeHtml(txid)}')" style="cursor: pointer; padding: 12px 14px; ${isEv ? 'border-left: 3px solid #a855f7; background: linear-gradient(90deg, rgba(168, 85, 247, 0.06) 0%, rgba(15, 23, 42, 0.6) 100%);' : ''}">
         <div class="tx-item-left">
           <div class="tx-id-row" style="gap: 8px;">
             <span class="badge-confs" style="background: rgba(255, 184, 0, 0.15); color: #f59e0b; border-color: rgba(255, 184, 0, 0.4); font-size: 0.7rem; font-weight: 700;">⏳ PENDING</span>
@@ -911,18 +913,24 @@ function renderMempoolDetailContent(data) {
             <button type="button" class="mecha-mini-btn" style="height: 18px; padding: 0 4px; font-size: 0.65rem;" onclick="copyToClipboard('${escapeHtml(txid)}', event)">📋</button>
           </div>
           <div class="tx-badges-row" style="margin-top: 6px;">
-            ${isEv ? '<span class="mini-tag-evolve" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 4px; padding: 1px 6px; font-size: 0.68rem; font-weight: 700;">🧬 TRU-EVOLVE</span>' : ''}
             ${isHtlc ? '<span class="mini-tag-htlc" style="font-weight: 700;">HTLC SWAP</span>' : ''}
             ${isVault ? '<span class="mini-tag-vault" style="font-weight: 700;">VAULT</span>' : ''}
             <span style="font-size: 0.72rem; color: #94a3b8;">${tx.inputs_count || (tx.inputs ? tx.inputs.length : 1)} in / ${tx.outputs_count || (tx.outputs ? tx.outputs.length : 1)} out</span>
             <span style="font-size: 0.72rem; color: #64748b;" class="live-time-ago" data-timestamp="${tx.first_seen_sec || 0}">First seen: ${timeText}</span>
           </div>
         </div>
-        <div class="tx-item-right" style="text-align: right;">
-          <div class="tx-amount-val" style="font-size: 1rem; color: ${isEv ? '#c084fc' : '#38bdf8'};">
-            ${isEv ? '0.0000 <span class="unit" style="font-size: 0.75rem; color: var(--tru-gold);">TRU</span> <span style="font-size: 0.7rem; color: #94a3b8; font-weight: 500;">(State Update)</span>' : `${amount.toFixed(4)} <span class="unit" style="font-size: 0.75rem;">TRU</span>`}
-          </div>
-          <span style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700;">Inspect Transaction ↗</span>
+        <div class="tx-item-right" style="text-align: right; align-items: flex-end;">
+          ${isEv ? `
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+              <span class="badge-ai-evolve" style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(192, 132, 252, 0.12)); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.45); font-size: 0.74rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; box-shadow: 0 0 10px rgba(168, 85, 247, 0.15); display: inline-flex; align-items: center; gap: 4px;">
+                🧬 AI EVOLVE
+              </span>
+              <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 600; font-family: var(--font-mono);">Fee: ${feeStr} <span style="color: var(--tru-gold);">TRU</span></span>
+            </div>
+          ` : `
+            <div class="tx-amount-val" style="font-size: 1rem; color: #38bdf8;">${amount.toFixed(4)} <span class="unit" style="font-size: 0.75rem;">TRU</span></div>
+            <span style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700;">Inspect Transaction ↗</span>
+          `}
         </div>
       </div>
     `;
@@ -1109,6 +1117,7 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
         height: null,
         timestamp: m.first_seen_sec,
         amountTru: isEv ? 0.0 : (m.total_out_tru || 0),
+        feeTru: m.fee_tru || 0.0001,
         isEvolve: isEv,
         isHtlc: m.is_htlc,
         isVault: m.is_vault_related,
@@ -1128,6 +1137,7 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
             height: b.height,
             timestamp: b.timestamp,
             amountTru: s.is_evolve ? 0.0 : (s.amount_tru || 0),
+            feeTru: s.fee_tru || 0.0001,
             isEvolve: s.is_evolve,
             isHtlc: s.is_htlc,
             isVault: false,
@@ -1146,6 +1156,7 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
             height: b.height,
             timestamp: b.timestamp,
             amountTru: amountPerTx,
+            feeTru: 0.0001,
             isEvolve: false,
             isHtlc: false,
             isVault: false,
@@ -1165,8 +1176,9 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
   }
 
   const itemsHtml = displayedTxs.map(t => {
+    const feeStr = (t.feeTru !== undefined && t.feeTru > 0 ? t.feeTru : 0.0001).toFixed(4);
     return `
-      <div class="feed-tx-item" onclick="inspectTx('${escapeHtml(t.txid)}')" title="Click to inspect Transaction ${escapeHtml(t.txid)}">
+      <div class="feed-tx-item" onclick="inspectTx('${escapeHtml(t.txid)}')" title="Click to inspect Transaction ${escapeHtml(t.txid)}" style="${t.isEvolve ? 'border-left: 3px solid #a855f7; background: linear-gradient(90deg, rgba(168, 85, 247, 0.06) 0%, rgba(15, 23, 42, 0.6) 100%);' : ''}">
         <div class="tx-item-left">
           <div class="tx-id-row">
             <span class="tx-id-text">${escapeHtml(t.txid.slice(0, 10))}...${escapeHtml(t.txid.slice(-8))}</span>
@@ -1178,22 +1190,23 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
             ` : `
               <span class="badge-confs" style="font-size: 0.65rem; padding: 1px 5px;">#${t.height}</span>
             `}
-            ${t.isEvolve ? '<span class="mini-tag-evolve" style="background: rgba(168, 85, 247, 0.18); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 4px; padding: 1px 6px; font-size: 0.65rem; font-weight: 700;">🧬 TRU-EVOLVE</span>' : ''}
             ${t.isHtlc ? '<span class="mini-tag-htlc">HTLC</span>' : ''}
             ${t.isVault ? '<span class="mini-tag-vault">Vault</span>' : ''}
             <span style="font-size: 0.7rem; color: #64748b;" class="live-time-ago" data-timestamp="${t.timestamp}">${timeAgo(t.timestamp)}</span>
           </div>
         </div>
-        <div class="tx-item-right">
-          <div class="tx-amount-val">
-            ${t.isEvolve ? `
-              <span style="color: #c084fc; font-weight: 700;">0.00 <span class="unit" style="color: var(--tru-gold);">TRU</span></span>
-              <span style="font-size: 0.68rem; color: #94a3b8; font-weight: 500; margin-left: 2px;">(State Update)</span>
-            ` : `
-              ${t.amountTru.toFixed(2)} <span class="unit">TRU</span>
-            `}
-          </div>
-          <span style="font-size: 0.7rem; color: var(--accent-cyan); font-weight: 700;">Details ↗</span>
+        <div class="tx-item-right" style="align-items: flex-end;">
+          ${t.isEvolve ? `
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+              <span class="badge-ai-evolve" style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(192, 132, 252, 0.12)); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.45); font-size: 0.74rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; box-shadow: 0 0 10px rgba(168, 85, 247, 0.15); display: inline-flex; align-items: center; gap: 4px;">
+                🧬 AI EVOLVE
+              </span>
+              <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 600; font-family: var(--font-mono);">Fee: ${feeStr} <span style="color: var(--tru-gold);">TRU</span></span>
+            </div>
+          ` : `
+            <div class="tx-amount-val">${t.amountTru.toFixed(2)} <span class="unit">TRU</span></div>
+            <span style="font-size: 0.7rem; color: var(--accent-cyan); font-weight: 700;">Details ↗</span>
+          `}
         </div>
       </div>
     `;
