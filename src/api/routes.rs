@@ -24,23 +24,23 @@ use super::handlers::{
 };
 use super::websocket::ws_handler;
 
-const HTML_CONTENT: &str = include_str!("../ui/index.html");
-const EXPLORER_HTML: &str = include_str!("../ui/explorer.html");
-const DOCS_HTML: &str = include_str!("../ui/docs.html");
-const CSS_VARIABLES: &str = include_str!("../ui/css/variables.css");
-const CSS_HEADER: &str = include_str!("../ui/css/header.css");
-const CSS_CARDS: &str = include_str!("../ui/css/cards.css");
-const CSS_MODALS: &str = include_str!("../ui/css/modals.css");
+pub(crate) const HTML_CONTENT: &str = include_str!("../ui/index.html");
+pub(crate) const EXPLORER_HTML: &str = include_str!("../ui/explorer.html");
+pub(crate) const DOCS_HTML: &str = include_str!("../ui/docs.html");
+pub(crate) const CSS_VARIABLES: &str = include_str!("../ui/css/variables.css");
+pub(crate) const CSS_HEADER: &str = include_str!("../ui/css/header.css");
+pub(crate) const CSS_CARDS: &str = include_str!("../ui/css/cards.css");
+pub(crate) const CSS_MODALS: &str = include_str!("../ui/css/modals.css");
 
-const JS_CONFIG: &str = include_str!("../ui/js/config.js");
-const JS_SOCKET: &str = include_str!("../ui/js/socket.js");
-const JS_ORDERBOOK: &str = include_str!("../ui/js/orderbook.js");
-const JS_SWAP: &str = include_str!("../ui/js/swap.js");
-const JS_VAULT: &str = include_str!("../ui/js/vault.js");
-const JS_APP: &str = include_str!("../ui/js/app.js");
-const JS_QRCODE: &str = include_str!("../ui/js/qrcode.min.js");
-const JS_JSQR: &str = include_str!("../ui/js/jsqr.min.js");
-const JS_EXPLORER: &str = include_str!("../ui/js/explorer.js");
+pub(crate) const JS_CONFIG: &str = include_str!("../ui/js/config.js");
+pub(crate) const JS_SOCKET: &str = include_str!("../ui/js/socket.js");
+pub(crate) const JS_ORDERBOOK: &str = include_str!("../ui/js/orderbook.js");
+pub(crate) const JS_SWAP: &str = include_str!("../ui/js/swap.js");
+pub(crate) const JS_VAULT: &str = include_str!("../ui/js/vault.js");
+pub(crate) const JS_APP: &str = include_str!("../ui/js/app.js");
+pub(crate) const JS_QRCODE: &str = include_str!("../ui/js/qrcode.min.js");
+pub(crate) const JS_JSQR: &str = include_str!("../ui/js/jsqr.min.js");
+pub(crate) const JS_EXPLORER: &str = include_str!("../ui/js/explorer.js");
 
 #[derive(Clone)]
 pub struct AppState {
@@ -231,6 +231,21 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/automation/logs", get(super::handlers::get_automation_logs))
         .route("/api/tx/:txid", get(super::handlers::get_tx_details))
         .route("/explorer", get(serve_explorer))
+        .route("/explorer/", get(serve_explorer))
+        .route("/explorer/css/variables.css", get(|| serve_css(CSS_VARIABLES)))
+        .route("/explorer/css/header.css", get(|| serve_css(CSS_HEADER)))
+        .route("/explorer/css/cards.css", get(|| serve_css(CSS_CARDS)))
+        .route("/explorer/css/modals.css", get(|| serve_css(CSS_MODALS)))
+        .route("/explorer/js/config.js", get(|| serve_js(JS_CONFIG)))
+        .route("/explorer/js/explorer.js", get(|| serve_js(JS_EXPLORER)))
+        .route("/explorer/api/stats", get(super::handlers::get_explorer_stats))
+        .route("/explorer/api/explorer/stats", get(super::handlers::get_explorer_stats))
+        .route("/explorer/api/search", get(super::handlers::get_explorer_search))
+        .route("/explorer/api/explorer/search", get(super::handlers::get_explorer_search))
+        .route("/explorer/api/blocks", get(super::handlers::get_blocks))
+        .route("/explorer/api/block/:query", get(super::handlers::get_block_details))
+        .route("/explorer/api/tx/:txid", get(super::handlers::get_tx_details))
+        .route("/explorer/api/mempool", get(get_mempool))
         .route("/js/explorer.js", get(|| serve_js(JS_EXPLORER)))
         .route("/api/blocks", get(super::handlers::get_blocks))
         .route("/api/block/:query", get(super::handlers::get_block_details))
@@ -288,13 +303,16 @@ async fn serve_explorer(
     State(state): State<AppState>,
     Query(_query): Query<AuthQuery>,
 ) -> impl IntoResponse {
-    let html = EXPLORER_HTML.replace(
-        "let sessionToken = \"\";",
-        &format!(
-            "let sessionToken = \"{}\";\n    window.SERVER_SESSION_TOKEN = \"{}\";",
-            state.session_token, state.session_token
-        ),
-    );
+    let html = EXPLORER_HTML
+        .replace(
+            "let sessionToken = \"\";",
+            &format!(
+                "let sessionToken = \"{}\";\n    window.SERVER_SESSION_TOKEN = \"{}\";",
+                state.session_token, state.session_token
+            ),
+        )
+        .replace("href=\"/css/", "href=\"/explorer/css/")
+        .replace("src=\"/js/", "src=\"/explorer/js/");
     (
         [
             (axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8"),

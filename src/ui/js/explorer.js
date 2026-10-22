@@ -1,4 +1,5 @@
 // TRUSWAP Real-Time Blockchain Explorer Logic
+const EXPLORER_BASE = (typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/explorer')) ? '/explorer' : '';
 let currentTipHeight = 0;
 let lastSeenBlockHash = '';
 let lastBlockTimestamp = 0;
@@ -113,7 +114,7 @@ async function inspectTx(txid) {
   `;
 
   try {
-    const res = await fetch('/api/tx/' + cleanTxid);
+    const res = await fetch(EXPLORER_BASE + '/api/tx/' + cleanTxid);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `HTTP ${res.status}`);
@@ -349,7 +350,7 @@ async function inspectBlock(query) {
   `;
 
   try {
-    const res = await fetch('/api/block/' + cleanQ);
+    const res = await fetch(EXPLORER_BASE + '/api/block/' + cleanQ);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `HTTP ${res.status}`);
@@ -605,7 +606,7 @@ async function inspectAddress(addr) {
   `;
 
   try {
-    const res = await fetch('/api/explorer/search?q=' + encodeURIComponent(cleanA));
+    const res = await fetch(EXPLORER_BASE + '/api/explorer/search?q=' + encodeURIComponent(cleanA));
     const data = await res.json();
     if (!data.found || data.target_type !== 'address') {
       throw new Error(data.error || 'Address not observed in current scanned block window.');
@@ -734,7 +735,7 @@ async function inspectMempool(preloadedData) {
   try {
     let data = preloadedData;
     if (!data) {
-      const res = await fetch('/api/mempool');
+      const res = await fetch(EXPLORER_BASE + '/api/mempool');
       if (!res.ok) throw new Error('HTTP ' + res.status);
       data = await res.json();
     }
@@ -876,7 +877,7 @@ async function handleExplorerSearch(event) {
   showToast('Searching ledger for ' + q.slice(0, 16) + '...', 'info');
 
   try {
-    const res = await fetch('/api/explorer/search?q=' + encodeURIComponent(q));
+    const res = await fetch(EXPLORER_BASE + '/api/explorer/search?q=' + encodeURIComponent(q));
     const data = await res.json();
     if (data.found) {
       if (data.target_type === 'block') {
@@ -1055,9 +1056,9 @@ async function pollExplorerTelemetry() {
   try {
     const fetchLimit = Math.max(currentBlocksLimit, currentTxsLimit);
     const [statsRes, blocksRes, mempoolRes] = await Promise.all([
-      fetch('/api/explorer/stats').then(r => r.ok ? r.json() : null),
-      fetch(`/api/blocks?limit=${fetchLimit}`).then(r => r.ok ? r.json() : null),
-      fetch('/api/mempool').then(r => r.ok ? r.json() : null),
+      fetch(EXPLORER_BASE + '/api/explorer/stats').then(r => r.ok ? r.json() : null),
+      fetch(`${EXPLORER_BASE}/api/blocks?limit=${fetchLimit}`).then(r => r.ok ? r.json() : null),
+      fetch(EXPLORER_BASE + '/api/mempool').then(r => r.ok ? r.json() : null),
     ]);
 
     if (statsRes) {

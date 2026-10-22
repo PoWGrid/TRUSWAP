@@ -57,17 +57,30 @@ pub async fn run_relay_service(cfg: Config) -> Result<(), Box<dyn std::error::Er
         .clone()
         .start_p2p_sync(p2p_node.clone(), orderbook.clone());
 
-    // 6. Initialize Base watcher (blazing or ultrablazing)
+    // 6. Initialize BlockScanner for real-time Post-Quantum WOTS+ Explorer
+    let empty_orderbook = Arc::new(crate::swap::Orderbook::new());
+    let block_scanner = Arc::new(crate::tru_p2p::BlockScanner::new(
+        p2p_node.clone(),
+        empty_orderbook,
+    ));
+    block_scanner.set_data_dir(cfg.data_dir.clone());
+    if cfg.resync_from_genesis {
+        block_scanner.set_resync_from_genesis(true);
+    }
+    block_scanner.clone().start();
+
+    // 7. Initialize Base watcher (blazing or ultrablazing)
     let base_watcher = BaseWatcher::new(&cfg);
     let _base_handle = base_watcher.clone().start(orderbook.clone());
 
-    // 7. Assemble server context and create Axum router
+    // 8. Assemble server context and create Axum router
     let ctx = RelayServerContext {
         orderbook: orderbook.clone(),
         guard,
         utxo_guard,
         base_watcher,
         mode_str,
+        block_scanner,
     };
 
     let router = create_relay_router(ctx);

@@ -23,6 +23,11 @@ use super::state::HotOrderbookState;
 use crate::relay::base_watcher::BaseWatcher;
 use crate::relay::utxo_guard::UtxoGuard;
 
+use crate::api::routes::{
+    CSS_CARDS, CSS_HEADER, CSS_MODALS, CSS_VARIABLES, EXPLORER_HTML, JS_CONFIG, JS_EXPLORER,
+};
+use crate::tru_p2p::BlockScanner;
+
 #[derive(Clone)]
 pub struct RelayServerContext {
     pub orderbook: Arc<HotOrderbookState>,
@@ -30,15 +35,218 @@ pub struct RelayServerContext {
     pub utxo_guard: Arc<UtxoGuard>,
     pub base_watcher: Arc<BaseWatcher>,
     pub mode_str: String,
+    pub block_scanner: Arc<BlockScanner>,
 }
 
 /// Creates the Axum router for the TRUSwap Relay service
 pub fn create_relay_router(ctx: RelayServerContext) -> Router {
     Router::new()
+        // WebSocket Orderbook & Health
         .route("/orderbook", get(ws_orderbook_handler))
         .route("/orderbook/health", get(health_handler))
         .route("/health", get(health_handler))
+        // Post-Quantum Explorer UI & Assets
+        .route("/explorer", get(serve_relay_explorer))
+        .route("/explorer/", get(serve_relay_explorer))
+        .route("/explorer/css/variables.css", get(|| serve_relay_css(CSS_VARIABLES)))
+        .route("/explorer/css/header.css", get(|| serve_relay_css(CSS_HEADER)))
+        .route("/explorer/css/cards.css", get(|| serve_relay_css(CSS_CARDS)))
+        .route("/explorer/css/modals.css", get(|| serve_relay_css(CSS_MODALS)))
+        .route("/explorer/js/config.js", get(|| serve_relay_js(JS_CONFIG)))
+        .route("/explorer/js/explorer.js", get(|| serve_relay_js(JS_EXPLORER)))
+        .route("/css/variables.css", get(|| serve_relay_css(CSS_VARIABLES)))
+        .route("/css/header.css", get(|| serve_relay_css(CSS_HEADER)))
+        .route("/css/cards.css", get(|| serve_relay_css(CSS_CARDS)))
+        .route("/css/modals.css", get(|| serve_relay_css(CSS_MODALS)))
+        .route("/js/config.js", get(|| serve_relay_js(JS_CONFIG)))
+        .route("/js/explorer.js", get(|| serve_relay_js(JS_EXPLORER)))
+        // Scoped Explorer APIs
+        .route("/explorer/api/stats", get(explorer_stats_handler))
+        .route("/explorer/api/explorer/stats", get(explorer_stats_handler))
+        .route("/explorer/api/search", get(explorer_search_handler))
+        .route("/explorer/api/explorer/search", get(explorer_search_handler))
+        .route("/explorer/api/blocks", get(explorer_blocks_handler))
+        .route("/explorer/api/block/:query", get(explorer_block_details_handler))
+        .route("/explorer/api/tx/:txid", get(explorer_tx_details_handler))
+        .route("/explorer/api/mempool", get(explorer_mempool_handler))
+        // Unscoped Fallback Explorer APIs
+        .route("/api/explorer/stats", get(explorer_stats_handler))
+        .route("/api/explorer/search", get(explorer_search_handler))
+        .route("/api/blocks", get(explorer_blocks_handler))
+        .route("/api/block/:query", get(explorer_block_details_handler))
+        .route("/api/tx/:txid", get(explorer_tx_details_handler))
+        .route("/api/mempool", get(explorer_mempool_handler))
         .with_state(ctx)
+}
+
+async fn serve_relay_css(content: &'static str) -> impl IntoResponse {
+    (
+        [
+            (axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (axum::http::header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        content,
+    )
+}
+
+async fn serve_relay_js(content: &'static str) -> impl IntoResponse {
+    (
+        [
+            (axum::http::header::CONTENT_TYPE, "application/javascript; charset=utf-8"),
+            (axum::http::header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        content,
+    )
+}
+
+async fn serve_relay_explorer() -> impl IntoResponse {
+    let html = EXPLORER_HTML
+        .replace("href=\"/css/", "href=\"/explorer/css/")
+        .replace("src=\"/js/", "src=\"/explorer/js/");
+    (
+        [
+            (axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8"),
+            (axum::http::header::CACHE_CONTROL, "no-cache, no-store, must-revalidate, max-age=0"),
+            (axum::http::header::PRAGMA, "no-cache"),
+            (axum::http::header::EXPIRES, "0"),
+        ],
+        html,
+    )
+}
+
+async fn explorer_stats_handler(State(ctx): State<RelayServerContext>) -> Response {
+    let stats = ctx.block_scanner.get_explorer_stats().await;
+    (StatusCode::OK, axum::Json(stats)).into_response()
+}
+
+#[derive(serde::Deserialize)]
+pub struct ExplorerSearchQuery {
+    pub q: Option<String>,
+}
+
+async fn explorer_search_handler(
+    State(ctx): State<RelayServerContext>,
+    axum::extract::Query(query): axum::extract::Query<ExplorerSearchQuery>,
+) -> Response {
+    let q = query.q.unwrap_or_default();
+    let res = ctx.block_scanner.search_explorer(&q).await;
+    (StatusCode::OK, axum::Json(res)).into_response()
+}
+
+#[derive(serde::Deserialize)]
+pub struct BlocksQuery {
+    pub limit: Option<usize>,
+}
+
+async fn explorer_blocks_handler(
+    State(ctx): State<RelayServerContext>,
+    axum::extract::Query(query): axum::extract::Query<BlocksQuery>,
+) -> Response {
+    let limit = query.limit.unwrap_or(30);
+    let blocks = ctx.block_scanner.get_recent_blocks(limit).await;
+    (StatusCode::OK, axum::Json(blocks)).into_response()
+}
+
+async fn explorer_block_details_handler(
+    State(ctx): State<RelayServerContext>,
+    axum::extract::Path(query): axum::extract::Path<String>,
+) -> Response {
+    if let Some(block) = ctx.block_scanner.get_block_by_query(&query).await {
+        (
+            StatusCode::OK,
+            axum::Json(serde_json::json!({
+                "found": true,
+                "block": block
+            })),
+        )
+            .into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({
+                "found": false,
+                "error": "Block not found in local chain index",
+                "query": query
+            })),
+        )
+            .into_response()
+    }
+}
+
+async fn explorer_tx_details_handler(
+    State(ctx): State<RelayServerContext>,
+    axum::extract::Path(txid): axum::extract::Path<String>,
+) -> Response {
+    let clean_txid = txid.trim().to_lowercase();
+    if clean_txid.is_empty() || clean_txid.len() > 64 {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({
+                "found": false,
+                "error": "Invalid transaction hash",
+                "txid": clean_txid
+            })),
+        )
+            .into_response();
+    }
+
+    if let Some(details) = ctx.block_scanner.get_tx_details(&clean_txid).await {
+        let is_confirmed = details.confirmations > 0 && details.block_height.is_some();
+        let status = if is_confirmed { "CONFIRMED" } else { "PENDING" };
+
+        let formatted_time = if details.timestamp > 0 {
+            chrono::DateTime::from_timestamp(details.timestamp as i64, 0)
+                .map(|dt| dt.format("%m/%d/%Y, %I:%M:%S %p").to_string())
+                .unwrap_or_else(|| "Recent".to_string())
+        } else {
+            "Pending".to_string()
+        };
+
+        (
+            StatusCode::OK,
+            axum::Json(serde_json::json!({
+                "found": true,
+                "txid": details.txid,
+                "status": status,
+                "is_confirmed": is_confirmed,
+                "confirmations": details.confirmations,
+                "block_height": details.block_height,
+                "block_hash": details.block_hash,
+                "timestamp": details.timestamp,
+                "formatted_time": formatted_time,
+                "version": details.version,
+                "lock_time": details.lock_time,
+                "is_coinbase": details.is_coinbase,
+                "is_quantum": details.is_quantum,
+                "inputs": details.inputs,
+                "outputs": details.outputs,
+            })),
+        )
+            .into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({
+                "found": false,
+                "error": "Transaction not found in local mempool or confirmed blocks",
+                "txid": clean_txid
+            })),
+        )
+            .into_response()
+    }
+}
+
+async fn explorer_mempool_handler(State(ctx): State<RelayServerContext>) -> Response {
+    let txs = ctx.block_scanner.get_mempool().await;
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::json!({
+            "success": true,
+            "count": txs.len(),
+            "transactions": txs,
+        })),
+    )
+        .into_response()
 }
 
 async fn health_handler(State(ctx): State<RelayServerContext>) -> Response {
@@ -826,12 +1034,16 @@ mod tests {
         let utxo_guard = UtxoGuard::new();
         let base_watcher = BaseWatcher::new(&cfg);
 
+        let p2p = Arc::new(crate::tru_p2p::client::TruP2PNode::new_with_data_dir(vec![], None));
+        let block_scanner = Arc::new(BlockScanner::new(p2p, Arc::new(crate::swap::Orderbook::new())));
+
         let ctx = RelayServerContext {
             orderbook: orderbook.clone(),
             guard,
             utxo_guard,
             base_watcher,
             mode_str: "Test".to_string(),
+            block_scanner,
         };
 
         let secp = secp256k1::Secp256k1::new();
