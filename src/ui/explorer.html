@@ -784,7 +784,7 @@
 
     <div class="mecha-header-inner">
       <!-- Brand with Explorer Badge -->
-      <div class="mecha-brand" onclick="location.href='/'" style="cursor: pointer;" title="Back to TRUSWAP Market">
+      <div class="mecha-brand" onclick="if (window.location.pathname.startsWith('/explorer')) { if (window.showLiveFeedView) window.showLiveFeedView(); } else { location.href='/'; }" style="cursor: pointer;" title="TRUSWAP Explorer">
         <div class="mecha-brand-info">
           <div class="mecha-brand-title-row">
             <span class="mecha-brand-title">TRUSWAP</span>
@@ -796,7 +796,7 @@
 
       <!-- Navigation & Telemetry Pod -->
       <div class="mecha-telemetry">
-        <a href="/" class="swap-market-btn" title="Back to TRUSWAP Market">
+        <a href="/" class="swap-market-btn" id="header-swap-market-btn" title="Back to TRUSWAP Market">
           <span>⚡</span> Swap Market
         </a>
 
@@ -960,8 +960,8 @@
   <footer>
     <div style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;">
       <span>TRUSWAP Explorer</span>
-      <span style="color: var(--card-border);">•</span>
-      <a href="/docs" style="color: var(--accent-cyan); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.22); transition: all 0.2s ease;" onmouseover="this.style.borderColor='var(--accent-cyan)'; this.style.boxShadow='0 0 10px rgba(0,240,255,0.3)';" onmouseout="this.style.borderColor='rgba(0, 240, 255, 0.22)'; this.style.boxShadow='none';" title="Read The TRUSWAP Book — Comprehensive Guide & Architecture">
+      <span style="color: var(--card-border);" id="footer-book-dot">•</span>
+      <a href="/docs" id="footer-book-link" style="color: var(--accent-cyan); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.22); transition: all 0.2s ease;" onmouseover="this.style.borderColor='var(--accent-cyan)'; this.style.boxShadow='0 0 10px rgba(0,240,255,0.3)';" onmouseout="this.style.borderColor='rgba(0, 240, 255, 0.22)'; this.style.boxShadow='none';" title="Read The TRUSWAP Book — Comprehensive Guide & Architecture">
         <span style="font-size: 0.95rem;">📖</span>
         <span>The TRUSWAP Book</span>
       </a>

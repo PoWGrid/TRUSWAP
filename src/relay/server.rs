@@ -102,7 +102,11 @@ async fn serve_relay_js(content: &'static str) -> impl IntoResponse {
 async fn serve_relay_explorer() -> impl IntoResponse {
     let html = EXPLORER_HTML
         .replace("href=\"/css/", "href=\"/explorer/css/")
-        .replace("src=\"/js/", "src=\"/explorer/js/");
+        .replace("src=\"/js/", "src=\"/explorer/js/")
+        .replace(
+            "</head>",
+            "<style>#header-swap-market-btn, #footer-book-dot, #footer-book-link, .swap-market-btn { display: none !important; }</style></head>",
+        );
     (
         [
             (axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8"),
