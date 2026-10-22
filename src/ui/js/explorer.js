@@ -71,6 +71,69 @@ function fallbackCopy(text) {
   document.body.removeChild(ta);
 }
 
+// --- TRU-EVOLVE Protocol Utilities ---
+function isEvolveTx(data) {
+  if (!data) return false;
+  if (data.is_evolve || data.isEvolve) return true;
+  const outputs = Array.isArray(data.outputs) ? data.outputs : [];
+  return outputs.some(o => {
+    const spk = (o.script_pubkey || '').toLowerCase();
+    return spk.includes('5452555f45564f4c5645') || spk.includes('5452555f544f4b454e5f45564f4c5645');
+  });
+}
+
+function parseEvolvePayload(spkHex) {
+  if (!spkHex || typeof spkHex !== 'string') return null;
+  const hex = spkHex.toLowerCase().replace(/^0x/, '');
+  if (!hex.startsWith('6a')) return null;
+
+  let idx = 2; // skip OP_RETURN (0x6a)
+  const chunks = [];
+  while (idx < hex.length) {
+    const op = parseInt(hex.substr(idx, 2), 16);
+    idx += 2;
+    let len = 0;
+    if (op <= 75) {
+      len = op;
+    } else if (op === 76) {
+      len = parseInt(hex.substr(idx, 2), 16);
+      idx += 2;
+    } else {
+      break;
+    }
+    if (idx + len * 2 > hex.length) break;
+    const chunkHex = hex.substr(idx, len * 2);
+    idx += len * 2;
+
+    let str = '';
+    let isAscii = true;
+    for (let c = 0; c < chunkHex.length; c += 2) {
+      const code = parseInt(chunkHex.substr(c, 2), 16);
+      if (code >= 32 && code <= 126) {
+        str += String.fromCharCode(code);
+      } else {
+        isAscii = false;
+        break;
+      }
+    }
+    chunks.push({ hex: chunkHex, str: isAscii ? str : null });
+  }
+
+  if (chunks.length > 0 && chunks[0].str && (chunks[0].str.includes('TRU_EVOLVE') || chunks[0].str.includes('TRU_TOKEN_EVOLVE'))) {
+    return {
+      protocol: chunks[0].str,
+      tokenId: chunks[1] ? (chunks[1].str || chunks[1].hex) : '—',
+      symbol: chunks[2] ? (chunks[2].str || 'NCFT') : 'NCFT',
+      epoch: chunks[3] ? (chunks[3].str || '0') : '0',
+      engine: chunks[4] ? (chunks[4].str || chunks[4].hex) : '—',
+      mutation: chunks[5] ? (chunks[5].str || chunks[5].hex) : '—',
+      prevHash: chunks[6] ? (chunks[6].str || chunks[6].hex) : '',
+      newHash: chunks[7] ? (chunks[7].str || chunks[7].hex) : '',
+    };
+  }
+  return null;
+}
+
 // --- Navigation & View Toggling ---
 
 function showLiveFeedView() {
@@ -152,6 +215,12 @@ function renderTxDetailContent(data) {
   const isQuantumTx = !!data.is_quantum
     || outputs.some(o => o.is_quantum || (o.address && o.address.startsWith('truq1:')) || (o.script_pubkey && (o.script_pubkey.includes('bb51') || o.script_pubkey.includes('bb'))))
     || inputs.some(i => i.is_quantum || (i.script_sig && i.script_sig.length >= 2000));
+  const isEvolve = isEvolveTx(data);
+  const evolveOutput = outputs.find(o => {
+    const spk = (o.script_pubkey || '').toLowerCase();
+    return spk.includes('5452555f45564f4c5645') || spk.includes('5452555f544f4b454e5f45564f4c5645');
+  });
+  const evolvePayload = evolveOutput ? parseEvolvePayload(evolveOutput.script_pubkey) : null;
 
   const inputsHtml = inputs.length > 0 ? inputs.map((inp, idx) => {
     const isCb = inp.is_coinbase || (inp.prev_txid && (inp.prev_txid.toLowerCase().includes('genesis') || inp.prev_txid.split('').every(c => c === '0')));
@@ -177,9 +246,14 @@ function renderTxDetailContent(data) {
 
   const outputsHtml = outputs.length > 0 ? outputs.map(out => {
     const isQuantum = out.is_quantum || (out.address && out.address.startsWith('truq1:')) || (out.script_pubkey && out.script_pubkey.includes('bb51'));
+    const isOutEvolveAnchor = (out.script_pubkey && ((out.script_pubkey.toLowerCase().includes('5452555f45564f4c5645') || out.script_pubkey.toLowerCase().includes('5452555f544f4b454e5f45564f4c5645')))) || (isEvolve && (out.amount_atoms === 0 || out.amount_tru === 0));
+    const isCarrierReturn = isEvolve && !isOutEvolveAnchor && (out.amount_atoms > 0 || out.amount_tru > 0);
+
     const target = out.display_target || out.address || `${data.txid}:${out.vout}`;
     let shortTarget = target;
-    if (out.address && out.address.startsWith('truq1:')) {
+    if (isOutEvolveAnchor) {
+      shortTarget = '🧬 TRU-EVOLVE Anchor Commitment';
+    } else if (out.address && out.address.startsWith('truq1:')) {
       const parts = out.address.split(':');
       const scriptPart = parts[1] || '';
       const checksumPart = parts[2] || '';
@@ -196,13 +270,17 @@ function renderTxDetailContent(data) {
     return `
       <div class="tru-tx-io-item">
         <div class="tru-tx-target-group">
-          ${out.address ? `
+          ${isOutEvolveAnchor ? `
+            <span class="tru-tx-target-text" style="color: #c084fc; font-weight: 700;">🧬 TRU-EVOLVE Anchor</span>
+            <span class="mini-tag-quantum" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 4px; padding: 1px 6px; font-size: 0.65rem; font-weight: 700;">OP_RETURN</span>
+          ` : (out.address ? `
             <span class="tru-tx-target-link" onclick="inspectAddress('${escapeHtml(out.address)}')" title="Filter Address: ${escapeHtml(out.address)}">${escapeHtml(shortTarget)}</span>
             <button type="button" class="mecha-mini-btn" style="height: 18px; padding: 0 4px; font-size: 0.65rem;" onclick="copyToClipboard('${escapeHtml(out.address)}', event)" title="Copy Address">📋</button>
           ` : `
             <span class="tru-tx-target-text" title="${escapeHtml(target)}">${escapeHtml(shortTarget)}</span>
             <button type="button" class="mecha-mini-btn" style="height: 18px; padding: 0 4px; font-size: 0.65rem;" onclick="copyToClipboard('${escapeHtml(target)}', event)" title="Copy Target">📋</button>
-          `}
+          `)}
+          ${isCarrierReturn ? '<span class="mini-tag-vault" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 4px; padding: 1px 6px; font-size: 0.65rem; font-weight: 700;">↩ Self-Return / Carrier</span>' : ''}
           ${isQuantum ? '<span class="mini-tag-quantum" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 4px; padding: 1px 6px; font-size: 0.65rem; font-weight: 700;">⚡ Quantum WOTS+</span>' : ''}
           ${hasWotsVerify ? '<span class="mini-tag-quantum" style="background: rgba(168, 85, 247, 0.12); color: #e879f9; border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 4px; padding: 1px 5px; font-size: 0.65rem;" title="Opcode 0xbb: OP_CHECKWOTSVERIFY">OP_CHECKWOTSVERIFY</span>' : ''}
           ${out.is_htlc ? '<span class="mini-tag-htlc">HTLC Script</span>' : ''}
@@ -210,6 +288,7 @@ function renderTxDetailContent(data) {
         </div>
         <div class="tru-tx-io-amount">
           ${amtStr}<span class="tru-unit">TRU</span>
+          ${isCarrierReturn ? '<div style="font-size: 0.65rem; color: #94a3b8; font-weight: 500; text-align: right;">Returned to Initiator</div>' : ''}
         </div>
       </div>
     `;
@@ -221,6 +300,11 @@ function renderTxDetailContent(data) {
         ← Back to Live Feeds
       </button>
       <div style="display: flex; gap: 8px;">
+        ${isEvolve ? `
+          <span class="badge-confs" style="background: rgba(168, 85, 247, 0.18); color: #c084fc; border-color: rgba(168, 85, 247, 0.45); font-weight: 700;">
+            🧬 TRU-EVOLVE STATE MUTATION
+          </span>
+        ` : ''}
         ${isQuantumTx ? `
           <span class="badge-confs" style="background: rgba(168, 85, 247, 0.18); color: #c084fc; border-color: rgba(168, 85, 247, 0.45); font-weight: 700;">
             ⚡ QUANTUM WOTS+ SECURED
@@ -248,6 +332,33 @@ function renderTxDetailContent(data) {
       </div>
     </div>
 
+    ${isEvolve ? `
+      <div class="tru-tx-notice-box" style="margin-top: 14px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 10px; padding: 14px 18px; text-align: left; display: flex; gap: 14px; align-items: flex-start;">
+        <div style="font-size: 28px; line-height: 1;">🧬</div>
+        <div style="flex: 1;">
+          <div style="color: #c084fc; font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+            TRU-EVOLVE Protocol Transaction (On-Chain State Mutation)
+            <span style="font-size: 0.72rem; color: #a855f7; background: rgba(168, 85, 247, 0.2); padding: 2px 7px; border-radius: 4px; font-family: monospace;">CONTRACT STATE</span>
+          </div>
+          <div style="color: #cbd5e1; font-size: 0.8rem; line-height: 1.5;">
+            In TRU-EVOLVE transactions, on-chain neural agent/token connectome state is cryptographically mutated and committed. No funds are transferred to third parties (<strong>External Transfer Volume: 0.00 TRU</strong>). The output amount is the initiator's token carrier / self-return balance returning back to their address.
+          </div>
+          ${evolvePayload ? `
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(168, 85, 247, 0.25); display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; font-size: 0.76rem;">
+              <div><span style="color: #94a3b8;">Protocol:</span> <code style="color: #e879f9; font-weight: 700;">${escapeHtml(evolvePayload.protocol)}</code></div>
+              <div><span style="color: #94a3b8;">Asset Symbol:</span> <code style="color: var(--accent-cyan); font-weight: 700;">${escapeHtml(evolvePayload.symbol)}</code></div>
+              <div><span style="color: #94a3b8;">Token ID:</span> <code style="color: #f1f5f9;">${escapeHtml(evolvePayload.tokenId)}</code></div>
+              <div><span style="color: #94a3b8;">Epoch:</span> <code style="color: var(--tru-gold); font-weight: 700;">#${escapeHtml(evolvePayload.epoch)}</code></div>
+              <div><span style="color: #94a3b8;">Engine:</span> <code style="color: #f1f5f9;">${escapeHtml(evolvePayload.engine)}</code></div>
+              <div><span style="color: #94a3b8;">Mutation:</span> <code style="color: #f1f5f9;">${escapeHtml(evolvePayload.mutation)}</code></div>
+              ${evolvePayload.prevHash ? `<div style="grid-column: 1 / -1;"><span style="color: #94a3b8;">Prev Hash:</span> <code style="font-size: 0.7rem; color: #94a3b8; word-break: break-all;">${escapeHtml(evolvePayload.prevHash)}</code></div>` : ''}
+              ${evolvePayload.newHash ? `<div style="grid-column: 1 / -1;"><span style="color: #94a3b8;">New State Hash:</span> <code style="font-size: 0.7rem; color: #a855f7; word-break: break-all;">${escapeHtml(evolvePayload.newHash)}</code></div>` : ''}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    ` : ''}
+
     <!-- IO Grid -->
     <div class="tru-tx-io-grid">
       <div class="tru-tx-io-col">
@@ -272,6 +383,18 @@ function renderTxDetailContent(data) {
     <div class="tru-tx-meta-box">
       <div class="tru-tx-meta-title">Block & Network Metadata</div>
       <div class="tru-tx-meta-grid">
+        <div class="tru-tx-meta-row">
+          <span class="tru-tx-meta-label">Transaction Type:</span>
+          <span class="tru-tx-meta-val" style="color: ${isEvolve ? '#c084fc' : (data.is_coinbase ? 'var(--tru-gold)' : '#f1f5f9')}; font-weight: 700;">
+            ${isEvolve ? '🧬 TRU-EVOLVE Contract Mutation' : (data.is_coinbase ? '🪙 Coinbase Mint' : 'Standard Transfer')}
+          </span>
+        </div>
+        <div class="tru-tx-meta-row">
+          <span class="tru-tx-meta-label">Transfer Volume:</span>
+          <span class="tru-tx-meta-val" style="color: ${isEvolve ? '#c084fc' : 'var(--accent-cyan)'}; font-weight: 700;">
+            ${isEvolve ? '0.00 TRU (Self-Return State Update)' : `${(outputs.reduce((acc, o) => acc + (o.amount_tru || 0), 0)).toFixed(4)} TRU`}
+          </span>
+        </div>
         <div class="tru-tx-meta-row">
           <span class="tru-tx-meta-label">Block Height:</span>
           <span class="tru-tx-meta-val highlight-gold">
@@ -765,12 +888,16 @@ function renderMempoolDetailContent(data) {
   const count = data.count !== undefined ? data.count : rawTxs.length;
   let totalTru = 0;
   for (const tx of rawTxs) {
-    totalTru += tx.total_out_tru || (tx.total_out_atoms ? tx.total_out_atoms / 100000000 : 0);
+    const isEv = isEvolveTx(tx);
+    if (!isEv) {
+      totalTru += tx.total_out_tru || (tx.total_out_atoms ? tx.total_out_atoms / 100000000 : 0);
+    }
   }
 
   const txsListHtml = rawTxs.length > 0 ? rawTxs.map((tx, idx) => {
     const txid = tx.txid || '';
-    const amount = (tx.total_out_tru !== undefined ? tx.total_out_tru : (tx.total_out_atoms || 0) / 100000000);
+    const isEv = isEvolveTx(tx);
+    const amount = isEv ? 0.0 : (tx.total_out_tru !== undefined ? tx.total_out_tru : (tx.total_out_atoms || 0) / 100000000);
     const timeText = tx.first_seen_sec ? timeAgo(tx.first_seen_sec) : 'Just now';
     const isHtlc = !!tx.is_htlc;
     const isVault = !!tx.is_vault_related;
@@ -784,6 +911,7 @@ function renderMempoolDetailContent(data) {
             <button type="button" class="mecha-mini-btn" style="height: 18px; padding: 0 4px; font-size: 0.65rem;" onclick="copyToClipboard('${escapeHtml(txid)}', event)">📋</button>
           </div>
           <div class="tx-badges-row" style="margin-top: 6px;">
+            ${isEv ? '<span class="mini-tag-evolve" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 4px; padding: 1px 6px; font-size: 0.68rem; font-weight: 700;">🧬 TRU-EVOLVE</span>' : ''}
             ${isHtlc ? '<span class="mini-tag-htlc" style="font-weight: 700;">HTLC SWAP</span>' : ''}
             ${isVault ? '<span class="mini-tag-vault" style="font-weight: 700;">VAULT</span>' : ''}
             <span style="font-size: 0.72rem; color: #94a3b8;">${tx.inputs_count || (tx.inputs ? tx.inputs.length : 1)} in / ${tx.outputs_count || (tx.outputs ? tx.outputs.length : 1)} out</span>
@@ -791,7 +919,9 @@ function renderMempoolDetailContent(data) {
           </div>
         </div>
         <div class="tx-item-right" style="text-align: right;">
-          <div class="tx-amount-val" style="font-size: 1rem; color: #38bdf8;">${amount.toFixed(4)} <span class="unit" style="font-size: 0.75rem;">TRU</span></div>
+          <div class="tx-amount-val" style="font-size: 1rem; color: ${isEv ? '#c084fc' : '#38bdf8'};">
+            ${isEv ? '0.0000 <span class="unit" style="font-size: 0.75rem; color: var(--tru-gold);">TRU</span> <span style="font-size: 0.7rem; color: #94a3b8; font-weight: 500;">(State Update)</span>' : `${amount.toFixed(4)} <span class="unit" style="font-size: 0.75rem;">TRU</span>`}
+          </div>
           <span style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700;">Inspect Transaction ↗</span>
         </div>
       </div>
@@ -972,12 +1102,14 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
   // 1. Mempool Txs first
   if (Array.isArray(mempoolTxs)) {
     for (const m of mempoolTxs) {
+      const isEv = isEvolveTx(m);
       allTxs.push({
         txid: m.txid,
         isMempool: true,
         height: null,
         timestamp: m.first_seen_sec,
-        amountTru: m.total_out_tru || 0,
+        amountTru: isEv ? 0.0 : (m.total_out_tru || 0),
+        isEvolve: isEv,
         isHtlc: m.is_htlc,
         isVault: m.is_vault_related,
       });
@@ -987,8 +1119,23 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
   // 2. Mined user transactions from recent blocks (exclude technical coinbase mints)
   if (Array.isArray(recentBlocks)) {
     for (const b of recentBlocks) {
-      if (Array.isArray(b.txids) && b.txids.length > 1) {
-        // txids[0] is always the coinbase mint. User transfers/consolidations start at index 1.
+      if (Array.isArray(b.tx_summaries) && b.tx_summaries.length > 0) {
+        for (const s of b.tx_summaries) {
+          if (s.is_coinbase) continue; // exclude coinbase mint
+          allTxs.push({
+            txid: s.txid,
+            isMempool: false,
+            height: b.height,
+            timestamp: b.timestamp,
+            amountTru: s.is_evolve ? 0.0 : (s.amount_tru || 0),
+            isEvolve: s.is_evolve,
+            isHtlc: s.is_htlc,
+            isVault: false,
+          });
+          if (allTxs.length >= currentTxsLimit + 50) break;
+        }
+      } else if (Array.isArray(b.txids) && b.txids.length > 1) {
+        // Fallback for older blocks
         const userTxs = b.txids.slice(1);
         const userAmount = Math.max(0, (b.total_amount_tru || 0) - 50.0);
         const amountPerTx = userTxs.length > 0 ? (userAmount / userTxs.length) : userAmount;
@@ -999,6 +1146,7 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
             height: b.height,
             timestamp: b.timestamp,
             amountTru: amountPerTx,
+            isEvolve: false,
             isHtlc: false,
             isVault: false,
           });
@@ -1030,13 +1178,21 @@ function renderTransactionsFeed(mempoolTxs, recentBlocks) {
             ` : `
               <span class="badge-confs" style="font-size: 0.65rem; padding: 1px 5px;">#${t.height}</span>
             `}
+            ${t.isEvolve ? '<span class="mini-tag-evolve" style="background: rgba(168, 85, 247, 0.18); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 4px; padding: 1px 6px; font-size: 0.65rem; font-weight: 700;">🧬 TRU-EVOLVE</span>' : ''}
             ${t.isHtlc ? '<span class="mini-tag-htlc">HTLC</span>' : ''}
             ${t.isVault ? '<span class="mini-tag-vault">Vault</span>' : ''}
             <span style="font-size: 0.7rem; color: #64748b;" class="live-time-ago" data-timestamp="${t.timestamp}">${timeAgo(t.timestamp)}</span>
           </div>
         </div>
         <div class="tx-item-right">
-          <div class="tx-amount-val">${t.amountTru.toFixed(2)} <span class="unit">TRU</span></div>
+          <div class="tx-amount-val">
+            ${t.isEvolve ? `
+              <span style="color: #c084fc; font-weight: 700;">0.00 <span class="unit" style="color: var(--tru-gold);">TRU</span></span>
+              <span style="font-size: 0.68rem; color: #94a3b8; font-weight: 500; margin-left: 2px;">(State Update)</span>
+            ` : `
+              ${t.amountTru.toFixed(2)} <span class="unit">TRU</span>
+            `}
+          </div>
           <span style="font-size: 0.7rem; color: var(--accent-cyan); font-weight: 700;">Details ↗</span>
         </div>
       </div>

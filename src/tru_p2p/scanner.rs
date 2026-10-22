@@ -83,6 +83,8 @@ pub struct MempoolEntry {
     pub change_amount_tru: f64,
     pub is_vault_related: bool,
     pub is_htlc: bool,
+    #[serde(default)]
+    pub is_evolve: bool,
     pub htlc_hash160: Option<String>,
     pub htlc_timelock: Option<u32>,
     pub outputs: Vec<MempoolOutput>,
@@ -111,6 +113,8 @@ pub struct CachedTruTx {
     pub is_coinbase: bool,
     #[serde(default)]
     pub is_quantum: bool,
+    #[serde(default)]
+    pub is_evolve: bool,
     pub block_height: Option<u32>,
     pub block_hash: Option<String>,
     pub confirmations: u32,
@@ -144,6 +148,20 @@ pub struct CachedTruTxOut {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CachedBlockTxSummary {
+    pub txid: String,
+    pub amount_tru: f64,
+    #[serde(default)]
+    pub is_evolve: bool,
+    #[serde(default)]
+    pub is_coinbase: bool,
+    #[serde(default)]
+    pub is_quantum: bool,
+    #[serde(default)]
+    pub is_htlc: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CachedTruBlock {
     pub height: u32,
     pub hash: String,
@@ -158,6 +176,8 @@ pub struct CachedTruBlock {
     pub size_bytes: usize,
     pub total_amount_tru: f64,
     pub txids: Vec<String>,
+    #[serde(default)]
+    pub tx_summaries: Vec<CachedBlockTxSummary>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1508,25 +1528,36 @@ impl BlockScanner {
         };
 
         let mut block_txids: Vec<String> = Vec::new();
+        let mut block_tx_summaries: Vec<CachedBlockTxSummary> = Vec::new();
         let mut block_total_atoms = 0u64;
 
         for raw_tx in &blk.transactions {
             if let Some(parsed) = parse_any_tx(raw_tx.as_bytes()) {
                 block_txids.push(parsed.txid.clone());
                 undo.txids.push(parsed.txid.clone());
-                for out in &parsed.outputs {
-                    block_total_atoms = block_total_atoms.saturating_add(out.amount_atoms);
+
+                let is_cb = parsed.is_coinbase || parsed.inputs.iter().any(|in_tx| in_tx.prev_txid.chars().all(|c| c == '0'));
+                let is_ev = parsed.outputs.iter().any(|o| {
+                    let spk = o.script_pubkey.to_lowercase();
+                    spk.starts_with("6a") && (spk.contains("5452555f45564f4c5645") || spk.contains("5452555f544f4b454e5f45564f4c5645"))
+                });
+
+                // Do not count self-return carrier outputs of EVOLVE transactions as external block transfer volume
+                if !is_ev {
+                    for out in &parsed.outputs {
+                        block_total_atoms = block_total_atoms.saturating_add(out.amount_atoms);
+                    }
                 }
 
                 // Populate internal transaction details cache
                 let cached_inputs: Vec<CachedTruTxIn> = parsed.inputs.iter().map(|in_tx| {
-                    let is_cb = parsed.is_coinbase || in_tx.prev_txid.chars().all(|c| c == '0');
+                    let is_in_cb = is_cb || in_tx.prev_txid.chars().all(|c| c == '0');
                     let is_quantum = in_tx.script_sig.len() >= 2000;
                     CachedTruTxIn {
                         prev_txid: in_tx.prev_txid.clone(),
                         prev_vout: in_tx.prev_vout,
                         script_sig: in_tx.script_sig.clone(),
-                        is_coinbase: is_cb,
+                        is_coinbase: is_in_cb,
                         is_quantum,
                     }
                 }).collect();
@@ -1555,13 +1586,32 @@ impl BlockScanner {
                 }).collect();
 
                 let is_quantum_tx = tx_has_quantum_out || cached_inputs.iter().any(|i| i.is_quantum);
+                let is_htlc_tx = parsed.outputs.iter().any(|o| inspect_htlc_script(&o.script_pubkey).is_some());
+
+                let tx_vol_atoms = if is_ev {
+                    0u64
+                } else if is_cb {
+                    50_0000_0000u64
+                } else {
+                    parsed.outputs.iter().map(|o| o.amount_atoms).sum::<u64>()
+                };
+
+                block_tx_summaries.push(CachedBlockTxSummary {
+                    txid: parsed.txid.clone(),
+                    amount_tru: tx_vol_atoms as f64 / 100_000_000.0,
+                    is_evolve: is_ev,
+                    is_coinbase: is_cb,
+                    is_quantum: is_quantum_tx,
+                    is_htlc: is_htlc_tx,
+                });
 
                 let cached_tx = CachedTruTx {
                     txid: parsed.txid.clone(),
                     version: block_version,
                     lock_time: 0,
-                    is_coinbase: parsed.is_coinbase,
+                    is_coinbase: is_cb,
                     is_quantum: is_quantum_tx,
+                    is_evolve: is_ev,
                     block_height: Some(block_height),
                     block_hash: Some(block_hash.clone()),
                     confirmations: 1,
@@ -1866,6 +1916,7 @@ impl BlockScanner {
             size_bytes: blk.transactions.iter().map(|t| t.len()).sum::<usize>() + blk.header.len(),
             total_amount_tru: block_total_atoms as f64 / 100_000_000.0,
             txids: block_txids,
+            tx_summaries: block_tx_summaries,
         };
 
         {
@@ -1912,7 +1963,7 @@ impl BlockScanner {
         let peers = self.p2p_node.peer_count();
         let mempool_lock = self.mempool.read().await;
         let mempool_count = mempool_lock.len();
-        let mempool_atoms: u64 = mempool_lock.values().map(|m| m.total_out_atoms).sum();
+        let mempool_atoms: u64 = mempool_lock.values().map(|m| if m.is_evolve { 0 } else { m.total_out_atoms }).sum();
         let mempool_tru = mempool_atoms as f64 / 100_000_000.0;
         let b_lock = self.block_cache.read().await;
         let cached_blocks_count = b_lock.len();
@@ -2207,7 +2258,14 @@ impl BlockScanner {
                 }
             }
 
-            let (target_atoms, change_atoms) = if is_htlc {
+            let is_evolve = parsed.outputs.iter().any(|o| {
+                let spk = o.script_pubkey.to_lowercase();
+                spk.starts_with("6a") && (spk.contains("5452555f45564f4c5645") || spk.contains("5452555f544f4b454e5f45564f4c5645"))
+            });
+
+            let (target_atoms, change_atoms) = if is_evolve {
+                (0, total_out_atoms)
+            } else if is_htlc {
                 let htlc_out = mempool_outputs.iter().find(|o| o.is_htlc).map(|o| o.amount_atoms).unwrap_or(total_out_atoms);
                 (htlc_out, total_out_atoms.saturating_sub(htlc_out))
             } else if is_vault_related {
@@ -2237,13 +2295,14 @@ impl BlockScanner {
                 inputs_count: parsed.inputs.len(),
                 outputs_count: parsed.outputs.len(),
                 total_out_atoms,
-                total_out_tru: total_out_atoms as f64 / 100_000_000.0,
+                total_out_tru: if is_evolve { 0.0 } else { total_out_atoms as f64 / 100_000_000.0 },
                 target_amount_atoms: target_atoms,
                 target_amount_tru: target_atoms as f64 / 100_000_000.0,
                 change_amount_atoms: change_atoms,
                 change_amount_tru: change_atoms as f64 / 100_000_000.0,
                 is_vault_related,
                 is_htlc,
+                is_evolve,
                 htlc_hash160,
                 htlc_timelock,
                 outputs: mempool_outputs,
@@ -2306,6 +2365,7 @@ impl BlockScanner {
                 lock_time: htlc_timelock.unwrap_or(0),
                 is_coinbase: parsed.is_coinbase,
                 is_quantum: is_mem_quantum,
+                is_evolve,
                 block_height: None,
                 block_hash: None,
                 confirmations: 0,
@@ -2392,6 +2452,7 @@ impl BlockScanner {
                     lock_time: entry.htlc_timelock.unwrap_or(0),
                     is_coinbase: false,
                     is_quantum: is_quantum_tx,
+                    is_evolve: entry.is_evolve,
                     block_height: None,
                     block_hash: None,
                     confirmations: 0,
@@ -2437,6 +2498,7 @@ impl BlockScanner {
                     lock_time: first.timelock,
                     is_coinbase: false,
                     is_quantum: false,
+                    is_evolve: false,
                     block_height: Some(block_h),
                     block_hash,
                     confirmations: confs,
@@ -2482,6 +2544,7 @@ impl BlockScanner {
                     lock_time: 0,
                     is_coinbase: false,
                     is_quantum: false,
+                    is_evolve: false,
                     block_height: Some(block_h),
                     block_hash,
                     confirmations: confs,
